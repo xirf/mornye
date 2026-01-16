@@ -1,6 +1,6 @@
+import { TypeMismatchError } from '../../errors';
 import type { DType, DTypeKind, InferDType, StorageType } from '../types';
 import type { ISeries } from './interface';
-import { TypeMismatchError } from '../../errors';
 import { createStorageFrom } from './storage';
 import { StringAccessor } from './string-accessor';
 
@@ -361,7 +361,7 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
           } else if (typeof val === 'boolean') {
             converted = val ? 1.0 : 0.0;
           } else {
-            converted = parseFloat(String(val)) || 0;
+            converted = Number.parseFloat(String(val)) || 0;
           }
           break;
         case 'int32':
@@ -370,7 +370,7 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
           } else if (typeof val === 'boolean') {
             converted = val ? 1 : 0;
           } else {
-            converted = parseInt(String(val), 10) || 0;
+            converted = Number.parseInt(String(val), 10) || 0;
           }
           break;
         case 'string':
@@ -410,10 +410,7 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
    * @param oldValue Value to replace
    * @param newValue Replacement value
    */
-  replace(
-    oldValue: InferDType<DType<T>>,
-    newValue: InferDType<DType<T>>,
-  ): Series<T> {
+  replace(oldValue: InferDType<DType<T>>, newValue: InferDType<DType<T>>): Series<T> {
     const results: InferDType<DType<T>>[] = [];
 
     for (const val of this) {
@@ -460,9 +457,7 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
 
     for (const val of this) {
       const isMissing =
-        val === null ||
-        val === undefined ||
-        (typeof val === 'number' && Number.isNaN(val));
+        val === null || val === undefined || (typeof val === 'number' && Number.isNaN(val));
 
       if (isMissing && lastValid !== null) {
         results.push(lastValid);
@@ -487,9 +482,7 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
     for (let i = values.length - 1; i >= 0; i--) {
       const val = values[i]!;
       const isMissing =
-        val === null ||
-        val === undefined ||
-        (typeof val === 'number' && Number.isNaN(val));
+        val === null || val === undefined || (typeof val === 'number' && Number.isNaN(val));
 
       if (isMissing && nextValid !== null) {
         results[i] = nextValid;
@@ -549,9 +542,7 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
     const results: boolean[] = [];
     for (const val of this) {
       const isMissing =
-        val === null ||
-        val === undefined ||
-        (typeof val === 'number' && Number.isNaN(val));
+        val === null || val === undefined || (typeof val === 'number' && Number.isNaN(val));
       results.push(isMissing);
     }
     return Series.bool(results);
@@ -565,9 +556,7 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
     const results: InferDType<DType<T>>[] = [];
     for (const val of this) {
       const isMissing =
-        val === null ||
-        val === undefined ||
-        (typeof val === 'number' && Number.isNaN(val));
+        val === null || val === undefined || (typeof val === 'number' && Number.isNaN(val));
       results.push(isMissing ? value : val);
     }
     return this._createFromValues(results);

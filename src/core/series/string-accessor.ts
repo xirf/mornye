@@ -77,7 +77,7 @@ export class StringAccessor {
   contains(pattern: string | RegExp): Series<'bool'> {
     const results: boolean[] = [];
     const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
-    
+
     for (const val of this.series) {
       results.push(val ? regex.test(val) : false);
     }
@@ -113,10 +113,14 @@ export class StringAccessor {
    */
   replace(pattern: string | RegExp, replacement: string): Series<'string'> {
     const results: string[] = [];
-    const regex = typeof pattern === 'string' 
-      ? new RegExp(pattern, 'g') 
-      : new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g');
-    
+    const regex =
+      typeof pattern === 'string'
+        ? new RegExp(pattern, 'g')
+        : new RegExp(
+            pattern.source,
+            pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`,
+          );
+
     for (const val of this.series) {
       results.push(val?.replace(regex, replacement) ?? '');
     }
@@ -214,9 +218,7 @@ export class StringAccessor {
       if (!val) {
         results.push('');
       } else {
-        results.push(
-          val.replace(/\b\w/g, (char) => char.toUpperCase())
-        );
+        results.push(val.replace(/\b\w/g, (char) => char.toUpperCase()));
       }
     }
     return Series.string(results);

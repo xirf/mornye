@@ -1,5 +1,5 @@
-import type { DTypeKind, StorageType } from '../types';
 import { SchemaError } from '../../errors';
+import type { DTypeKind, StorageType } from '../types';
 
 /**
  * Maps DTypeKind to its TypedArray constructor.
@@ -35,7 +35,10 @@ export function createStorage<T extends DTypeKind>(kind: T, length: number): Sto
     case 'bool':
       return new Uint8Array(length) as StorageType<T>;
     default:
-      throw new SchemaError(`unknown dtype '${kind}'`, `supported types: float64, int32, string, bool`);
+      throw new SchemaError(
+        `unknown dtype '${kind}'`,
+        'supported types: float64, int32, string, bool',
+      );
   }
 }
 
@@ -62,6 +65,9 @@ export function createStorageFrom<T extends DTypeKind>(
       return arr as StorageType<T>;
     }
     default:
-      throw new SchemaError(`unknown dtype '${kind}'`, `supported types: float64, int32, string, bool`);
+      throw new SchemaError(
+        `unknown dtype '${kind}'`,
+        'supported types: float64, int32, string, bool',
+      );
   }
 }
