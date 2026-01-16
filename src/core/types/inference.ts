@@ -1,18 +1,20 @@
 import type { DType, DTypeKind } from './dtype';
 
 /**
+ * Mapping of DTypeKind to TypeScript definition.
+ */
+export interface DTypeToPrimitive {
+  float64: number;
+  int32: number;
+  string: string;
+  bool: boolean;
+}
+
+/**
  * Maps DType to its corresponding TypeScript type.
  * Used for compile-time type inference.
  */
-export type InferDType<D extends DType<DTypeKind>> = D extends DType<'float64'>
-  ? number
-  : D extends DType<'int32'>
-    ? number
-    : D extends DType<'string'>
-      ? string
-      : D extends DType<'bool'>
-        ? boolean
-        : never;
+export type InferDType<D extends DType<DTypeKind>> = DTypeToPrimitive[D['kind']];
 
 /**
  * Maps DType to its underlying storage type.
