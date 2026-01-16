@@ -26,6 +26,7 @@ export function inferColumnType(samples: string[]): DType<DTypeKind> {
   }
 
   let allNumeric = true;
+  let allIntegers = true;
   let allBools = true;
   let hasNonEmpty = false;
 
@@ -49,6 +50,8 @@ export function inferColumnType(samples: string[]): DType<DTypeKind> {
     const num = Number(trimmed);
     if (Number.isNaN(num)) {
       allNumeric = false;
+    } else if (!Number.isInteger(num)) {
+      allIntegers = false;
     }
   }
 
@@ -61,9 +64,9 @@ export function inferColumnType(samples: string[]): DType<DTypeKind> {
     return m.bool();
   }
   
-  // Always use float64 for numeric columns to avoid truncation
+  // Use int32 if all numbers are integers, otherwise float64
   if (allNumeric) {
-    return m.float64();
+    return allIntegers ? m.int32() : m.float64();
   }
 
   return m.string();

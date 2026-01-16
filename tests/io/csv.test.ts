@@ -7,7 +7,8 @@ describe('CSV Reader', () => {
   const testCsvContent = `name,age,score,active
 Alice,25,95.5,true
 Bob,30,87.2,false
-Carol,22,91.8,true`;
+Carol,22,91.8,true
+`;
 
   beforeAll(async () => {
     // Create test fixture
@@ -24,14 +25,14 @@ Carol,22,91.8,true`;
 
   describe('basic parsing', () => {
     test('reads CSV with auto-inferred types', async () => {
-      const df = await readCsv(testCsvPath);
+      const { df } = await readCsv(testCsvPath);
 
       expect(df.shape).toEqual([3, 4]);
       expect(df.columns()).toEqual(['name', 'age', 'score', 'active']);
     });
 
     test('infers string type for names', async () => {
-      const df = await readCsv(testCsvPath);
+      const { df } = await readCsv(testCsvPath);
       const names = df.col('name');
 
       expect(names.dtype.kind).toBe('string');
@@ -39,7 +40,7 @@ Carol,22,91.8,true`;
     });
 
     test('infers int32 type for integers', async () => {
-      const df = await readCsv(testCsvPath);
+      const { df } = await readCsv(testCsvPath);
       const ages = df.col('age');
 
       expect(ages.dtype.kind).toBe('int32');
@@ -47,7 +48,7 @@ Carol,22,91.8,true`;
     });
 
     test('infers float64 type for decimals', async () => {
-      const df = await readCsv(testCsvPath);
+      const { df } = await readCsv(testCsvPath);
       const scores = df.col('score');
 
       expect(scores.dtype.kind).toBe('float64');
@@ -55,7 +56,7 @@ Carol,22,91.8,true`;
     });
 
     test('infers bool type for true/false', async () => {
-      const df = await readCsv(testCsvPath);
+      const { df } = await readCsv(testCsvPath);
       const active = df.col('active');
 
       expect(active.dtype.kind).toBe('bool');
@@ -72,7 +73,7 @@ Carol,22,91.8,true`;
         active: m.bool(),
       } as const;
 
-      const df = await readCsv(testCsvPath, { schema });
+      const { df } = await readCsv(testCsvPath, { schema });
       const ages = df.col('age');
 
       expect(ages.dtype.kind).toBe('float64');
@@ -81,7 +82,7 @@ Carol,22,91.8,true`;
 
   describe('options', () => {
     test('respects maxRows', async () => {
-      const df = await readCsv(testCsvPath, { maxRows: 2 });
+      const { df } = await readCsv(testCsvPath, { maxRows: 2 });
       expect(df.shape[0]).toBe(2);
     });
   });
@@ -93,7 +94,8 @@ describe('CSV Parser Edge Cases', () => {
 "Alice","Hello, World"
 "Bob","He said ""Hi"""
 "Carol","Line1
-Line2"`;
+Line2"
+`;
 
   beforeAll(async () => {
     await Bun.write(quotedCsvPath, quotedContent);
@@ -107,14 +109,14 @@ Line2"`;
   });
 
   test('handles quoted fields with commas', async () => {
-    const df = await readCsv(quotedCsvPath);
+    const { df } = await readCsv(quotedCsvPath);
     const descriptions = df.col('description');
 
     expect(descriptions.at(0)).toBe('Hello, World');
   });
 
   test('handles escaped quotes', async () => {
-    const df = await readCsv(quotedCsvPath);
+    const { df } = await readCsv(quotedCsvPath);
     const descriptions = df.col('description');
 
     expect(descriptions.at(1)).toBe('He said "Hi"');
@@ -123,7 +125,7 @@ Line2"`;
   // TODO: Supporting newlines in quoted fields requires streaming parser architecture
   // The current line-based reader splits on newlines before quote parsing
   test.skip('handles newlines in quoted fields', async () => {
-    const df = await readCsv(quotedCsvPath);
+    const { df } = await readCsv(quotedCsvPath);
     const descriptions = df.col('description');
 
     expect(descriptions.at(2)).toBe('Line1\nLine2');

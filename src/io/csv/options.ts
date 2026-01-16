@@ -22,6 +22,9 @@ export interface CsvOptions {
 
   /** Whether to track parse errors (default: true) */
   trackErrors?: boolean;
+
+  /** AbortSignal to cancel long-running reads */
+  signal?: AbortSignal;
 }
 
 /** Default CSV options */
@@ -33,6 +36,7 @@ export const DEFAULT_CSV_OPTIONS: Required<CsvOptions> = {
   sampleRows: 100,
   maxRows: Number.POSITIVE_INFINITY,
   trackErrors: true,
+  signal: undefined as unknown as AbortSignal,
 };
 
 /**

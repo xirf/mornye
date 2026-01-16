@@ -126,7 +126,7 @@ export class CsvChunkParser {
 
   private handleAfterQuoteState(byte: number): void {
     if (byte === this.quote) {
-      // Escaped quote - append single quote
+      // Escaped quote - append single quote, STAY in quoted mode
       this.appendByte(this.quote);
       this.state = State.QuotedField;
     } else if (byte === this.delimiter) {

@@ -16,7 +16,7 @@ import {
  * Performance profile (387MB, 7.38M rows):
  * - Target: ~1.5s on Bun
  * - Approach: Direct Uint8Array processing, minimal allocations
- * 
+ *
  * Returns a CsvReadResult with the DataFrame and any parse errors.
  */
 export async function readCsv<S extends Schema = Schema>(
@@ -95,7 +95,7 @@ export async function readCsv<S extends Schema = Schema>(
   // Pre-allocate storage
   const storage: (Float64Array | Int32Array | Uint8Array | string[])[] = [];
   const colTypes: DTypeKind[] = [];
-  
+
   // Error tracking
   const parseErrors = new Map<string, ParseFailures>();
 
@@ -117,7 +117,7 @@ export async function readCsv<S extends Schema = Schema>(
         storage[col] = new Array<string>(rowCount);
         break;
     }
-    
+
     if (trackErrors) {
       parseErrors.set(headers[col]!, createParseFailures(rowCount));
     }
@@ -125,6 +125,11 @@ export async function readCsv<S extends Schema = Schema>(
 
   // Parse rows directly into columns - optimized byte-level parsing
   for (let rowIdx = 0; rowIdx < rowCount; rowIdx++) {
+    // Periodically check abort signal (every 10000 rows for performance)
+    if (opts.signal?.aborted && rowIdx % 10000 === 0) {
+      throw new DOMException('Operation was aborted', 'AbortError');
+    }
+
     const lineIdx = startLineIdx + rowIdx;
     const lineStart = lineStarts[lineIdx]!;
     let lineEnd = (lineStarts[lineIdx + 1] ?? len) - 1;
@@ -135,25 +140,43 @@ export async function readCsv<S extends Schema = Schema>(
     for (let col = 0; col < numCols; col++) {
       // Find field end (handle quoted fields)
       let fieldEnd = fieldStart;
-      if (bytes[fieldStart] === 34) { // Quote character
+      if (bytes[fieldStart] === 34) {
+        // Quote character
         fieldStart++; // Skip opening quote
         fieldEnd = fieldStart;
-        while (fieldEnd < lineEnd && bytes[fieldEnd] !== 34) fieldEnd++;
+
+        // Scan for closing quote, handling escaped quotes ("")
+        while (fieldEnd < lineEnd) {
+          if (bytes[fieldEnd] === 34) {
+            if (fieldEnd + 1 < lineEnd && bytes[fieldEnd + 1] === 34) {
+              // Escaped quote - skip both characters being part of the field
+              fieldEnd += 2;
+              continue;
+            }
+            // Closing quote found
+            break;
+          }
+          fieldEnd++;
+        }
+
         const valueEnd = fieldEnd;
         fieldEnd++; // Skip closing quote
         if (fieldEnd < lineEnd && bytes[fieldEnd] === COMMA) fieldEnd++; // Skip comma
-        
+
         // For quoted fields, decode and store
         const dtype = colTypes[col]!;
         const store = storage[col]!;
-        const fieldStr = decoder.decode(bytes.subarray(fieldStart, valueEnd));
-        
+        let fieldStr = decoder.decode(bytes.subarray(fieldStart, valueEnd));
+        if (fieldStr.includes('""')) {
+          fieldStr = fieldStr.replaceAll('""', '"');
+        }
+
         switch (dtype) {
           case 'float64':
-            (store as Float64Array)[rowIdx] = parseFloat(fieldStr) || 0;
+            (store as Float64Array)[rowIdx] = Number.parseFloat(fieldStr) || 0;
             break;
           case 'int32':
-            (store as Int32Array)[rowIdx] = parseInt(fieldStr, 10) || 0;
+            (store as Int32Array)[rowIdx] = Number.parseInt(fieldStr, 10) || 0;
             break;
           case 'bool':
             (store as Uint8Array)[rowIdx] = fieldStr === 'true' || fieldStr === '1' ? 1 : 0;
@@ -245,10 +268,12 @@ function parseFloatFast(bytes: Uint8Array, start: number, end: number): number {
 
   let i = start;
   let negative = false;
-  if (bytes[i] === 45) { // '-'
+  if (bytes[i] === 45) {
+    // '-'
     negative = true;
     i++;
-  } else if (bytes[i] === 43) { // '+'
+  } else if (bytes[i] === 43) {
+    // '+'
     i++;
   }
 
@@ -259,7 +284,8 @@ function parseFloatFast(bytes: Uint8Array, start: number, end: number): number {
   }
 
   let result = intPart;
-  if (i < end && bytes[i] === 46) { // '.'
+  if (i < end && bytes[i] === 46) {
+    // '.'
     i++;
     let fracPart = 0;
     let fracDigits = 0;
