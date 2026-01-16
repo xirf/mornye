@@ -197,7 +197,7 @@ describe('DataFrame', () => {
       const df = DataFrame.from(schema, sampleData);
       const desc = df.describe();
       expect(desc.age).toBeDefined();
-      expect(desc.age.mean).toBeCloseTo(25.67, 1);
+      expect(desc.age?.mean).toBeCloseTo(25.67, 1);
     });
 
     test('info() returns DataFrame metadata', () => {
@@ -258,10 +258,11 @@ describe('DataFrame', () => {
 
   describe('missing value operations', () => {
     test('dropna() removes rows with NaN', () => {
-      const dfWithNaN = DataFrame.from(
-        { value: m.float64() },
-        [{ value: 1 }, { value: Number.NaN }, { value: 3 }],
-      );
+      const dfWithNaN = DataFrame.from({ value: m.float64() }, [
+        { value: 1 },
+        { value: Number.NaN },
+        { value: 3 },
+      ]);
       const cleaned = dfWithNaN.dropna();
 
       expect(cleaned.shape[0]).toBe(2);
@@ -269,20 +270,22 @@ describe('DataFrame', () => {
     });
 
     test('fillna() replaces NaN with value', () => {
-      const dfWithNaN = DataFrame.from(
-        { value: m.float64() },
-        [{ value: 1 }, { value: Number.NaN }, { value: 3 }],
-      );
+      const dfWithNaN = DataFrame.from({ value: m.float64() }, [
+        { value: 1 },
+        { value: Number.NaN },
+        { value: 3 },
+      ]);
       const filled = dfWithNaN.fillna(0);
 
       expect([...filled.col('value')]).toEqual([1, 0, 3]);
     });
 
     test('isna() returns boolean DataFrame', () => {
-      const dfWithNaN = DataFrame.from(
-        { value: m.float64() },
-        [{ value: 1 }, { value: Number.NaN }, { value: 3 }],
-      );
+      const dfWithNaN = DataFrame.from({ value: m.float64() }, [
+        { value: 1 },
+        { value: Number.NaN },
+        { value: 3 },
+      ]);
       const mask = dfWithNaN.isna();
 
       expect([...mask.col('value')]).toEqual([false, true, false]);

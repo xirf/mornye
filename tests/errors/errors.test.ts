@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { DataFrame, m, Series } from '../../src';
+import { DataFrame, Series, m } from '../../src';
 import {
   ColumnNotFoundError,
-  TypeMismatchError,
   IndexOutOfBoundsError,
   MornyeError,
   SchemaError,
+  TypeMismatchError,
 } from '../../src/errors';
 
 describe('Error Messages', () => {
@@ -78,7 +78,10 @@ describe('Error Messages', () => {
 
   describe('SchemaError', () => {
     test('shows detail and hint', () => {
-      const err = new SchemaError("unknown dtype 'complex'", 'supported: float64, int32, string, bool');
+      const err = new SchemaError(
+        "unknown dtype 'complex'",
+        'supported: float64, int32, string, bool',
+      );
       const formatted = err.format();
       expect(formatted).toContain('error: schema error');
       expect(formatted).toContain("unknown dtype 'complex'");
