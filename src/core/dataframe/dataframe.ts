@@ -394,6 +394,74 @@ export class DataFrame<S extends Schema> implements IDataFrame<S> {
   }
 
   /**
+   * Median per numeric column.
+   */
+  median(): Record<string, number> {
+    const result: Record<string, number> = {};
+    for (const colName of this._columnOrder) {
+      const series = this._columns.get(colName)!;
+      if (series.dtype.kind === 'float64' || series.dtype.kind === 'int32') {
+        result[colName as string] = series.median();
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Quantile per numeric column.
+   */
+  quantile(q: number): Record<string, number> {
+    const result: Record<string, number> = {};
+    for (const colName of this._columnOrder) {
+      const series = this._columns.get(colName)!;
+      if (series.dtype.kind === 'float64' || series.dtype.kind === 'int32') {
+        result[colName as string] = series.quantile(q);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Mode per column (returns all modes for each column).
+   */
+  mode(): Record<string, unknown[]> {
+    const result: Record<string, unknown[]> = {};
+    for (const colName of this._columnOrder) {
+      const series = this._columns.get(colName)!;
+      result[colName as string] = series.mode();
+    }
+    return result;
+  }
+
+  /**
+   * Cumulative sum across numeric columns.
+   */
+  cumsum(): DataFrame<S> {
+    return this._mapNumericColumns((s) => s.cumsum());
+  }
+
+  /**
+   * Cumulative product across numeric columns.
+   */
+  cumprod(): DataFrame<S> {
+    return this._mapNumericColumns((s) => s.cumprod());
+  }
+
+  /**
+   * Cumulative max across numeric columns.
+   */
+  cummax(): DataFrame<S> {
+    return this._mapNumericColumns((s) => s.cummax());
+  }
+
+  /**
+   * Cumulative min across numeric columns.
+   */
+  cummin(): DataFrame<S> {
+    return this._mapNumericColumns((s) => s.cummin());
+  }
+
+  /**
    * Return DataFrame with unique rows (alias for dropDuplicates with no args).
    */
   unique(): DataFrame<S> {
@@ -739,6 +807,23 @@ export class DataFrame<S extends Schema> implements IDataFrame<S> {
    */
   bfill(): DataFrame<S> {
     return cols.bfill(this, DataFrame._fromColumns);
+  }
+
+  private _mapNumericColumns(
+    transform: (s: Series<'float64' | 'int32'>) => Series<'float64' | 'int32'>,
+  ): DataFrame<S> {
+    const columns = new Map<keyof S, Series<DTypeKind>>();
+
+    for (const colName of this._columnOrder) {
+      const series = this._columns.get(colName)!;
+      if (series.dtype.kind === 'float64' || series.dtype.kind === 'int32') {
+        columns.set(colName, transform(series as Series<'float64' | 'int32'>));
+      } else {
+        columns.set(colName, series);
+      }
+    }
+
+    return DataFrame._fromColumns(this.schema, columns, this._columnOrder, this.shape[0]);
   }
 
   // Internal Helpers

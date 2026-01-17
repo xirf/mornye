@@ -41,6 +41,22 @@ describe('DataFrame Edge Cases', () => {
     });
   });
 
+  describe('Aggregation', () => {
+    test('cumulative operations only affect numeric columns', () => {
+      const df = DataFrame.fromColumns({ A: [1, 2, 3], B: ['x', 'y', 'z'] });
+      const csum = df.cumsum();
+      expect([...csum.col('A')]).toEqual([1, 3, 6]);
+      expect([...csum.col('B')]).toEqual(['x', 'y', 'z']);
+    });
+
+    test('median/quantile/mode return per-column results', () => {
+      const df = DataFrame.fromColumns({ A: [1, 2, 3, 4], B: ['a', 'a', 'b', 'b'] });
+      expect(df.median().A).toBe(2.5);
+      expect(df.quantile(0.25).A).toBe(1.75);
+      expect(df.mode().B).toEqual(['a', 'b']);
+    });
+  });
+
   describe('Head/Tail Edge Cases', () => {
     test('head(n) where n > length', () => {
       const df = DataFrame.fromColumns({ A: [1, 2] });

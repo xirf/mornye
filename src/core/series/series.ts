@@ -104,26 +104,20 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
       return undefined;
     }
     const baseIndex = this._offset + index;
-    const value = (this._data as StorageType<T>)[baseIndex];
-
-    // Convert bool storage (0/1) to boolean
-    if (this.dtype.kind === 'bool') {
-      return (value === 1) as InferDType<DType<T>>;
-    }
 
     if (this.dtype.kind === 'string' && isLazyStringColumn(this._data)) {
       const col = this._data;
 
       if (col.codes && col.dict) {
-        const code = col.codes[baseIndex];
+        const code:any = col.codes[baseIndex];
         return col.dict[code] as InferDType<DType<T>>;
       }
 
       const cached = col.cache[baseIndex];
       if (cached !== null && cached !== undefined) return cached as InferDType<DType<T>>;
 
-      const start = col.offsets[baseIndex];
-      const len = col.lengths[baseIndex];
+      const start = col.offsets[baseIndex]!;
+      const len = col.lengths[baseIndex]!;
       let str = col.buffer.toString('utf-8', start, start + len);
 
       if (col.needsUnescape && col.needsUnescape[baseIndex] === 1 && str.indexOf('"') !== -1) {
@@ -132,6 +126,13 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
 
       col.cache[baseIndex] = str;
       return str as InferDType<DType<T>>;
+    }
+
+    const value = (this._data as Exclude<StorageType<T>, LazyStringColumn>)[baseIndex];
+
+    // Convert bool storage (0/1) to boolean
+    if (this.dtype.kind === 'bool') {
+      return (value === 1) as InferDType<DType<T>>;
     }
 
     return value as InferDType<DType<T>>;
@@ -275,6 +276,114 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
   var(): number {
     const s = this.std();
     return s * s;
+  }
+
+  /**
+   * Median of numeric values. Returns NaN for empty series.
+   */
+  median(): number {
+    this._assertNumeric('median');
+    const values = this._numericValues();
+    return this._quantile(values, 0.5);
+  }
+
+  /**
+   * Quantile (0..1) of numeric values using linear interpolation.
+   */
+  quantile(q: number): number {
+    this._assertNumeric('quantile');
+    if (Number.isNaN(q) || q < 0 || q > 1) {
+      throw new RangeError('quantile q must be between 0 and 1');
+    }
+    const values = this._numericValues();
+    return this._quantile(values, q);
+  }
+
+  /**
+   * Mode(s) of the Series. Returns all values with highest frequency.
+   */
+  mode(): InferDType<DType<T>>[] {
+    const counts = new Map<InferDType<DType<T>>, number>();
+    for (const val of this) {
+      if (typeof val === 'number' && Number.isNaN(val)) continue;
+      counts.set(val, (counts.get(val) ?? 0) + 1);
+    }
+    if (counts.size === 0) return [];
+
+    let maxCount = 0;
+    for (const c of counts.values()) maxCount = Math.max(maxCount, c);
+
+    const modes: InferDType<DType<T>>[] = [];
+    for (const [val, c] of counts.entries()) {
+      if (c === maxCount) modes.push(val);
+    }
+    return modes;
+  }
+
+  /**
+   * Cumulative sum of numeric values.
+   */
+  cumsum(): Series<'float64' | 'int32'> {
+    this._assertNumeric('cumsum');
+    const out: number[] = new Array(this._len);
+    let acc = 0;
+    for (let i = 0; i < this._len; i++) {
+      acc += Number(this.at(i));
+      out[i] = acc;
+    }
+    return this.dtype.kind === 'int32'
+      ? (Series.int32(out) as Series<'int32'>)
+      : (Series.float64(out) as Series<'float64'>);
+  }
+
+  /**
+   * Cumulative product of numeric values.
+   */
+  cumprod(): Series<'float64' | 'int32'> {
+    this._assertNumeric('cumprod');
+    const out: number[] = new Array(this._len);
+    let acc = 1;
+    for (let i = 0; i < this._len; i++) {
+      acc *= Number(this.at(i));
+      out[i] = acc;
+    }
+    return this.dtype.kind === 'int32'
+      ? (Series.int32(out) as Series<'int32'>)
+      : (Series.float64(out) as Series<'float64'>);
+  }
+
+  /**
+   * Cumulative maximum of numeric values.
+   */
+  cummax(): Series<'float64' | 'int32'> {
+    this._assertNumeric('cummax');
+    const out: number[] = new Array(this._len);
+    let current = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < this._len; i++) {
+      const val = Number(this.at(i));
+      current = Number.isNaN(val) ? Number.NaN : Math.max(current, val);
+      out[i] = current;
+    }
+    return this.dtype.kind === 'int32'
+      ? (Series.int32(out) as Series<'int32'>)
+      : (Series.float64(out) as Series<'float64'>);
+  }
+
+  /**
+   * Cumulative minimum of numeric values.
+   */
+  cummin(): Series<'float64' | 'int32'> {
+    this._assertNumeric('cummin');
+    const out: number[] = new Array(this._len);
+    let current = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < this._len; i++) {
+      const val = Number(this.at(i));
+      current = Number.isNaN(val) ? Number.NaN : Math.min(current, val);
+      out[i] = current;
+    }
+    return this.dtype.kind === 'int32'
+      ? (Series.int32(out) as Series<'int32'>)
+      : (Series.float64(out) as Series<'float64'>);
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -663,6 +772,34 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
     }
   }
 
+  private _assertNumeric(method: string): asserts this is Series<'float64' | 'int32'> {
+    if (this.dtype.kind !== 'float64' && this.dtype.kind !== 'int32') {
+      throw new TypeMismatchError(method, this.dtype.kind, ['float64', 'int32']);
+    }
+  }
+
+  private _numericValues(): number[] {
+    const vals: number[] = [];
+    for (const v of this) {
+      const n = Number(v);
+      if (!Number.isNaN(n)) vals.push(n);
+    }
+    return vals.sort((a, b) => a - b);
+  }
+
+  private _quantile(sortedValues: number[], q: number): number {
+    if (sortedValues.length === 0) return Number.NaN;
+    if (sortedValues.length === 1) return sortedValues[0]!;
+
+    const pos = (sortedValues.length - 1) * q;
+    const lower = Math.floor(pos);
+    const upper = Math.ceil(pos);
+    if (lower === upper) return sortedValues[lower]!;
+
+    const weight = pos - lower;
+    return sortedValues[lower]! * (1 - weight) + sortedValues[upper]! * weight;
+  }
+
   // Internal
   // ===============================================================
 
@@ -670,8 +807,13 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
    * Returns underlying storage (for internal/advanced use).
    */
   _storage(): StorageType<T> {
+    // Get the data length, handling LazyStringColumn case
+    const dataLen = isLazyStringColumn(this._data)
+      ? this._data.codes?.length ?? this._data.offsets?.length ?? this._data.cache.length
+      : (this._data as { length: number }).length;
+
     // Return a view if using offset, otherwise return the data directly
-    if (this._offset === 0 && this._len === this._data.length) {
+    if (this._offset === 0 && this._len === dataLen) {
       return this._data;
     }
 

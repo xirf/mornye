@@ -131,6 +131,56 @@ Line2"
   });
 });
 
+describe('CSV datetime parsing', () => {
+  const datetimeCsvPath = './tests/fixtures/datetime.csv';
+  const datetimeContent = `id,ts_local,ts_iso,ts_unix_s,ts_unix_ms
+1,2021-03-04 12:30:00,2021-03-04T12:30:00Z,1614861000,1614861000000
+2,2021-03-04 00:00:00,2021-03-04T00:00:00+02:00,1614816000,1614816000000
+`;
+
+  beforeAll(async () => {
+    await Bun.write(datetimeCsvPath, datetimeContent);
+  });
+
+  afterAll(async () => {
+    const file = Bun.file(datetimeCsvPath);
+    if (await file.exists()) {
+      await file.delete().catch(() => {});
+    }
+  });
+
+  test('parses multiple datetime formats to epoch ms', async () => {
+    const { df } = await readCsv(datetimeCsvPath, {
+      datetime: {
+        defaultZone: 'UTC',
+        columns: {
+          ts_local: { format: 'sql', zone: 'UTC' },
+          ts_iso: { format: 'iso' },
+          ts_unix_s: { format: 'unix-s' },
+          ts_unix_ms: { format: 'unix-ms' },
+        },
+      },
+    });
+
+    const tsLocal = df.col('ts_local');
+    const tsIso = df.col('ts_iso');
+    const tsUnixS = df.col('ts_unix_s');
+    const tsUnixMs = df.col('ts_unix_ms');
+
+    expect(tsLocal.dtype.kind).toBe('float64');
+    expect(tsIso.dtype.kind).toBe('float64');
+
+    expect(tsLocal.at(0)).toBe(Date.UTC(2021, 2, 4, 12, 30, 0));
+    expect(tsIso.at(0)).toBe(Date.UTC(2021, 2, 4, 12, 30, 0));
+
+    // Second row ISO has +02:00 offset → UTC should be 22:00 previous day
+    expect(tsIso.at(1)).toBe(Date.UTC(2021, 2, 3, 22, 0, 0));
+
+    expect(tsUnixS.at(0)).toBe(1614861000000);
+    expect(tsUnixMs.at(0)).toBe(1614861000000);
+  });
+});
+
 describe('Lazy string storage edge cases', () => {
   const lazyCsvPath = './tests/fixtures/lazy-edge.csv';
   const lazyContent = `name,comment

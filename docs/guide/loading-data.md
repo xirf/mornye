@@ -3,18 +3,27 @@
 ## From CSV
 
 ```typescript
-import { readCsv } from 'mornye';
+import { readCsv } from "mornye";
 
-const { df } = await readCsv('./sales.csv');
+const { df } = await readCsv("./sales.csv");
 ```
 
 ### Options
 
 ```typescript
-const { df } = await readCsv('./data.csv', {
-  delimiter: ',',    // comma (default), or ';' or '\t'
-  hasHeader: true,   // first row is header
-  maxRows: 1000,     // limit rows
+const { df } = await readCsv("./data.csv", {
+  delimiter: ",", // comma (default), or ';' or '\t'
+  hasHeader: true, // first row is header
+  maxRows: 1000, // limit rows
+  datetime: {
+    defaultZone: "UTC",
+    columns: {
+      // parse to epoch ms (float64)
+      ordered_at: { format: "iso" },
+      shipped_at: { format: "sql", zone: "+02:00" },
+      created_unix: { format: "unix-s" },
+    },
+  },
 });
 ```
 
@@ -25,8 +34,8 @@ Create a DataFrame from column arrays:
 ```typescript
 const df = DataFrame.fromColumns({
   id: [1, 2, 3],
-  name: ['A', 'B', 'C'],
-  value: [10.5, 20.3, 15.8]
+  name: ["A", "B", "C"],
+  value: [10.5, 20.3, 15.8],
 });
 ```
 
@@ -35,10 +44,10 @@ const df = DataFrame.fromColumns({
 ### To CSV
 
 ```typescript
-import { writeCsv, toCsv } from 'mornye';
+import { writeCsv, toCsv } from "mornye";
 
 // Write to file
-await writeCsv(df, './output.csv');
+await writeCsv(df, "./output.csv");
 
 // Or get as string
 const csvString = toCsv(df);

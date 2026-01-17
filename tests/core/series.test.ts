@@ -134,6 +134,33 @@ describe('Series', () => {
       expect(desc.min).toBe(1);
       expect(desc.max).toBe(5);
     });
+
+    test('median() handles odd and even', () => {
+      const odd = Series.float64([1, 3, 2]);
+      const even = Series.float64([1, 2, 3, 4]);
+      expect(odd.median()).toBe(2);
+      expect(even.median()).toBe(2.5);
+    });
+
+    test('quantile() interpolates', () => {
+      const s = Series.float64([1, 2, 3, 4]);
+      expect(s.quantile(0)).toBe(1);
+      expect(s.quantile(0.5)).toBe(2.5);
+      expect(s.quantile(1)).toBe(4);
+    });
+
+    test('mode() returns all modes', () => {
+      const s = Series.int32([1, 2, 2, 3, 1]);
+      expect(s.mode()).toEqual([1, 2]);
+    });
+
+    test('cumulative operations', () => {
+      const s = Series.int32([1, 2, 3]);
+      expect([...s.cumsum()]).toEqual([1, 3, 6]);
+      expect([...s.cumprod()]).toEqual([1, 2, 6]);
+      expect([...s.cummax()]).toEqual([1, 2, 3]);
+      expect([...s.cummin()]).toEqual([1, 1, 1]);
+    });
   });
 
   describe('transformations', () => {
