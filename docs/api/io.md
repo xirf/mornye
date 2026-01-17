@@ -1,80 +1,84 @@
-# I/O
+# I/O API
 
-Functions for reading and writing data.
+Methods for reading data into and writing data out of Mornye.
 
-## Reading
+## Reading Data
 
-### `readCsv(path, options?)`
-
-Read a CSV file into a DataFrame.
+### `readCsv`
+Reads a CSV file into a DataFrame.
 
 ```typescript
-const { df } = await readCsv("./data.csv");
+readCsv(path: string, options?: CsvReadOptions): Promise<{ df: DataFrame, errors: CsvError[] }>
 ```
+
+**Returns:**
+An object containing:
+- `df`: The resulting DataFrame.
+- `errors`: An array of parsing errors (if any were strictly malformed but recoverable).
 
 **Options:**
-
-| Option       | Type                         | Default       | Description                                     |
-| ------------ | ---------------------------- | ------------- | ----------------------------------------------- |
-| `delimiter`  | `string`                     | `","`         | Field delimiter                                 |
-| `hasHeader`  | `boolean`                    | `true`        | First row is header                             |
-| `maxRows`    | `number`                     | `Infinity`    | Maximum rows to read                            |
-| `sampleRows` | `number`                     | `100`         | Rows to sample for type inference               |
-| `schema`     | `Schema`                     | auto          | Explicit column types                           |
-| `datetime`   | `{ defaultZone?, columns? }` | `{ UTC, {} }` | Column-level datetime parsing (epoch ms output) |
-
-**Datetime formats** (set per column):
-
-| Format    | Meaning                                  | Example                |
-| --------- | ---------------------------------------- | ---------------------- |
-| `iso`     | ISO-8601 (with optional offset or `Z`)   | `2021-03-04T12:30:00Z` |
-| `sql`     | `YYYY-MM-DD HH:mm[:ss[.fff]]]` with zone | `2021-03-04 12:30:00`  |
-| `date`    | Date only `YYYY-MM-DD` (no time)         | `2021-03-04`           |
-| `unix-s`  | Unix seconds                             | `1614861000`           |
-| `unix-ms` | Unix milliseconds                        | `1614861000000`        |
-
-For values without an offset, the zone defaults to `UTC` unless you set `defaultZone` or a column-level `zone` (e.g., `+02:00`). Parsed datetimes are stored as epoch milliseconds (`float64`).
-
-### `scanCsv(path, options?)`
-
-Create a LazyFrame for large files (on-demand loading).
-
 ```typescript
-const lazy = await scanCsv("./huge_file.csv");
-const first10 = await lazy.head(10);
+interface CsvReadOptions {
+  delimiter?: string;       // Default: ','
+  hasHeader?: boolean;      // Default: true
+  encoding?: string;        // Default: 'utf-8'
+  maxRows?: number;         // Stop after N rows
+  sampleRows?: number;      // Rows to scan for type inference (Default: 100)
+  nullValues?: string[];    // Strings to treat as null (e.g. ['NA', 'null'])
+  datetime?: {
+    defaultZone?: string;   // Default timezone (e.g. 'UTC')
+    columns?: Record<string, { format: 'iso'|'sql'|'unix-s'|'unix-ms', zone?: string }>
+  }
+}
 ```
 
-## Writing
-
-### `toCsv(df)`
-
-Convert DataFrame to CSV string.
-
+**Example:**
 ```typescript
-const csv = toCsv(df);
+const { df } = await readCsv('./data.csv', {
+  delimiter: '\t',
+  maxRows: 500
+});
 ```
 
-### `writeCsv(df, path)`
+---
 
-Write DataFrame to CSV file.
+### `scanCsv` (Lazy Loading)
+Creates a `LazyFrame` for processing files larger than memory.
 
 ```typescript
-await writeCsv(df, "./output.csv");
+scanCsv(path: string, options?: CsvReadOptions): Promise<LazyFrame>
 ```
 
-### `df.toJson()`
+> [!NOTE]
+> `LazyFrame` supports a subset of operations (filter, select, head) and executes them only when you call `.collect()`.
 
-Get DataFrame as JSON string.
+---
+
+## Writing Data
+
+### `writeCsv`
+Writes a DataFrame to a CSV file.
 
 ```typescript
-const json = df.toJson();
+writeCsv(df: DataFrame, path: string): Promise<void>
 ```
 
-### `df.toJsonRecords()`
+**Example:**
+```typescript
+await writeCsv(resultDf, './report.csv');
+```
 
-Get DataFrame as array of row objects.
+---
+
+### `toCsv`
+Converts a DataFrame to a CSV string.
 
 ```typescript
-const records = df.toJsonRecords();
-// [{ name: 'Alice', age: 25 }, ...]
+toCsv(df: DataFrame): string
+```
+
+**Example:**
+```typescript
+const csvString = toCsv(df);
+console.log(csvString);
 ```

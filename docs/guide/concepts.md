@@ -1,66 +1,88 @@
 # Core Concepts
 
-## DataFrame
+To use Mornye effectively, it helps to understand how it views your data. If you're coming from SQL or Excel, this will feel familiar. If you're coming from plain JavaScript arrays, it's a powerful upgrade.
 
-A **DataFrame** is a 2D table with named columns. Think of it like a spreadsheet or SQL table.
+## The Mental Model
 
-```typescript
-const df = DataFrame.fromColumns({
-  product: ['Apple', 'Banana', 'Orange'],
-  price: [1.20, 0.50, 0.80],
-  quantity: [100, 150, 80]
-});
-```
+Think of a **DataFrame** as a high-performance array of objects, but stored in a way that makes math and filtering incredibly fast.
 
-Each column has a consistent type: `string`, `int32`, `float64`, or `bool`.
+### DataFrame
+A `DataFrame` is a two-dimensional table with labeled columns.
 
-## Series
+| name (string) | age (int32) | active (bool) |
+| :------------ | :---------- | :------------ |
+| "Alice"       | 25          | true          |
+| "Bob"         | 30          | false         |
 
-A **Series** is a single column. You can extract it from a DataFrame:
+It knows the **shape** of your data (rows × columns) and the **data type** of each column.
 
-```typescript
-const prices = df.col('price');
+### Series
+A `Series` is a single column from that table.
 
-console.log(prices.sum());   // 2.50
-console.log(prices.mean());  // 0.83
-console.log(prices.max());   // 1.20
-```
+| age (int32) |
+| :---------- |
+| 25          |
+| 30          |
+
+In Mornye, a DataFrame is essentially a collection of aligned Series. When you select a column, you get a Series back.
+
+---
 
 ## Type Inference
 
-When you load a CSV, Mornye automatically infers column types:
+One of Mornye's strongest features is its ability to guess your data types so you don't have to type them manually.
 
-```csv
-name,age,active
-Alice,25,true
-Bob,30,false
-```
+When you load data (from CSV, JSON, or objects), Mornye scans the values to determine the best fit:
 
-Results in:
-- `name` → `string`
-- `age` → `float64` (all numbers default to float64)
-- `active` → `bool`
+| Input Value           | Inferred Type | Description                                          |
+| :-------------------- | :------------ | :--------------------------------------------------- |
+| `"Hello"`, `"AX-102"` | `string`      | Text data                                            |
+| `42`, `-10`           | `int32`       | Integers (if ALL values in column are whole numbers) |
+| `42.5`, `10.0`        | `float64`     | Decimals (or mixed int/float)                        |
+| `true`, `false`       | `bool`        | Boolean logic                                        |
+| `null`, `undefined`   | `null`        | Missing values (handled gracefully)                  |
 
-You can also provide an explicit schema:
+> [!IMPORTANT]
+> **Why strict types?**
+> By strictly enforcing types per column, Mornye prevents common JS bugs like adding a string `"10"` to a number `20` and getting `"1020"`. In Mornye, the math just works.
 
-```typescript
-import { m } from 'mornye';
+---
 
-const { df } = await readCsv('./data.csv', {
-  schema: {
-    name: m.string(),
-    age: m.float64(),  // Force float instead of int
-    active: m.bool()
-  }
-});
-```
+## Immutability by Design
 
-## Immutability
+Mornye follows a functional programming paradigm. **DataFrames are immutable.**
 
-All operations return a **new** DataFrame. The original is never modified.
+When you perform an operation like `.filter()` or `.sort()`, you are **not** changing the original variable. Instead, you get a brand new DataFrame returned to you.
+
+### Why is this good?
+1.  **Predictability**: You can pass `df` to ten different functions, and none of them can secretly mess up your data for the others.
+2.  **Chaining**: It enables the elegant method chaining you saw in the Getting Started guide.
+3.  **Debugging**: You can inspect the state of your data at any step in the pipeline.
 
 ```typescript
-const filtered = df.filter(row => row.price > 1);
-// df is unchanged
-// filtered is a new DataFrame
+const original = DataFrame.fromColumns({ a: [1, 2, 3] });
+
+// 'filtered' is a NEW DataFrame
+const filtered = original.filter(row => row.a > 1);
+
+// 'original' is completely untouched
+console.log(original.height); // 3
+console.log(filtered.height); // 2
 ```
+
+---
+
+## Memory & Performance
+
+Mornye is designed to be efficient, but it's helpful to know what's happening under the hood.
+
+- **Columnar Storage**: Data is stored by column, not by row. This is why calculating the `mean()` of a column is instant—the CPU can just zip through a single contiguous array of numbers.
+- **Lazy vs Eager**: Most standard DataFrame methods (like `filter`, `sort`) are **eager**—they happen immediately. Iterating through rows is optimized, but for massive datasets (millions of rows), you should be mindful of memory usage.
+- **Copy-on-Write**: While operations return new DataFrames, Mornye tries to share underlying data buffers where possible to save memory.
+
+## Summary
+
+- **DataFrame** = Table (collection of Series).
+- **Series** = Column (typed array).
+- **Types** are inferred but enforced.
+- **Immutability** means operations return new copies, keeping your source data safe.

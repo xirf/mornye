@@ -604,7 +604,7 @@ export class DataFrame<S extends Schema> implements IDataFrame<S> {
    * Sort DataFrame by one or more columns.
    * @example df.sort('age') or df.sort('age', false)
    */
-  sort<K extends keyof S>(column: K, ascending = true): DataFrame<S> {
+  sort<K extends keyof S>(column: K, ascending: boolean | 'asc' | 'desc' = true): DataFrame<S> {
     return ops.sort(this, column, ascending);
   }
 

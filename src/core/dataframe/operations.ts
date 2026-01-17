@@ -90,9 +90,10 @@ export function where<S extends Schema, K extends keyof S>(
 export function sort<S extends Schema, K extends keyof S>(
   ctx: OperationsContext<S>,
   column: K,
-  ascending = true,
+  ascending: boolean | 'asc' | 'desc' = true,
 ): DataFrame<S> {
   const series = ctx._columns.get(column)!;
+  const isAscending = ascending === true || ascending === 'asc';
 
   // Create index array and sort it
   const indices = Array.from({ length: ctx.shape[0] }, (_, i) => i);
@@ -102,12 +103,12 @@ export function sort<S extends Schema, K extends keyof S>(
     const valB = series.at(b);
 
     if (typeof valA === 'number' && typeof valB === 'number') {
-      return ascending ? valA - valB : valB - valA;
+      return isAscending ? valA - valB : valB - valA;
     }
 
     const strA = String(valA);
     const strB = String(valB);
-    return ascending ? strA.localeCompare(strB) : strB.localeCompare(strA);
+    return isAscending ? strA.localeCompare(strB) : strB.localeCompare(strA);
   });
 
   return ctx._selectRows(indices);

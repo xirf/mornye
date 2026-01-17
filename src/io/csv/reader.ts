@@ -1,9 +1,9 @@
 import type { Schema } from '../../core/types';
 import { type CsvOptions, resolveOptions } from './options';
 import type { CsvReadResult } from './parse-result';
+import { readCsvWithHybridParser } from './reader-quoted';
 import { computeLineStarts } from './reader-shared';
 import { readCsvUnquoted, supportsUnquotedPath } from './reader-unquoted';
-import { readCsvWithHybridParser } from './reader-quoted';
 
 /**
  * Ultra-fast CSV reader using optimized byte-level parsing.

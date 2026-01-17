@@ -230,4 +230,114 @@ describe('Series', () => {
       expect(c.length).toBe(s.length);
     });
   });
+
+  describe('type conversion', () => {
+    test('astype(int32) converts types', () => {
+      const s = Series.float64([1.1, 2.9, 3.5]);
+      const ints = s.astype('int32');
+      expect(ints.dtype.kind).toBe('int32');
+      expect([...ints]).toEqual([1, 2, 3]);
+
+      const bools = Series.bool([true, false]);
+      expect([...bools.astype('int32')]).toEqual([1, 0]);
+
+      const strs = Series.string(['1', '2', 'foo']);
+      expect([...strs.astype('int32')]).toEqual([1, 2, 0]);
+    });
+
+    test('astype(float64) converts types', () => {
+      const s = Series.int32([1, 2]);
+      const floats = s.astype('float64');
+      expect(floats.dtype.kind).toBe('float64');
+      expect([...floats]).toEqual([1.0, 2.0]);
+
+      const bools = Series.bool([true, false]);
+      expect([...bools.astype('float64')]).toEqual([1.0, 0.0]);
+
+      const strs = Series.string(['1.5', 'foo']);
+      expect([...strs.astype('float64')]).toEqual([1.5, 0]);
+    });
+
+    test('astype(string) converts to string', () => {
+      const s = Series.float64([1.5, 2.5]);
+      expect([...s.astype('string')]).toEqual(['1.5', '2.5']);
+    });
+
+    test('astype(bool) converts to boolean', () => {
+      const nums = Series.int32([1, 0, 2]);
+      expect([...nums.astype('bool')]).toEqual([true, false, true]);
+
+      const strs = Series.string(['true', '1', 'FALSE', 'other']);
+      expect([...strs.astype('bool')]).toEqual([true, true, false, false]);
+    });
+  });
+
+  describe('data cleaning', () => {
+    test('replace() swaps values', () => {
+      const s = Series.int32([1, 2, 1, 3]);
+      expect([...s.replace(1, 0)]).toEqual([0, 2, 0, 3]);
+    });
+
+    test('replace() handles NaN', () => {
+      const s = Series.float64([1, Number.NaN, 2]);
+      expect([...s.replace(Number.NaN, 0)]).toEqual([1, 0, 2]);
+    });
+
+    test('clip() clamps values', () => {
+      const s = Series.int32([1, 5, 10]);
+      expect([...s.clip(2, 8)]).toEqual([2, 5, 8]);
+      expect([...s.clip(undefined, 8)]).toEqual([1, 5, 8]);
+      expect([...s.clip(2, undefined)]).toEqual([2, 5, 10]);
+    });
+
+    test('clip() throws for strings', () => {
+      const s = Series.string(['a']);
+      expect(() => s.clip(1, 2)).toThrow();
+    });
+
+    test('ffill() propagates values forward', () => {
+      const s = Series.float64([1, Number.NaN, Number.NaN, 2, Number.NaN]);
+      expect([...s.ffill()]).toEqual([1, 1, 1, 2, 2]);
+    });
+
+    test('bfill() propagates values backward', () => {
+      const s = Series.float64([Number.NaN, 1, Number.NaN, 2, Number.NaN]);
+      // Last value remains NaN/null as there is no next value
+      // Bun test expect(..).toEqual([..]) might be strict on null vs undefined vs NaN
+      expect(s.bfill().toArray()).toEqual([1, 1, 2, 2, Number.NaN]);
+    });
+  });
+
+  describe('internal storage', () => {
+    test('_storage() returns underlying data', () => {
+      const s = Series.float64([1, 2, 3]);
+      const storage = s._storage(); // @ts-ignore
+      expect(storage).toBeInstanceOf(Float64Array);
+    });
+
+    test('_storage() returns view for sliced numeric series', () => {
+      const s = Series.float64([1, 2, 3, 4]);
+      const sliced = s.slice(1, 3);
+      const storage = sliced._storage(); // @ts-ignore
+      expect(storage.length).toBe(2);
+      expect(storage[0]).toBe(2);
+    });
+
+    test('_storage() returns sliced array for sliced string series', () => {
+      const s = Series.string(['a', 'b', 'c', 'd']);
+      const sliced = s.slice(1, 3);
+      const storage = sliced._storage(); // @ts-ignore
+      expect(storage).toEqual(['b', 'c']);
+    });
+  });
+
+  describe('display', () => {
+    test('print() logs to console', () => {
+      // Bun doesn't have a direct 'jest' object. We can check if it runs without error,
+      // or avoid mocking console.log if it's too complex in this env.
+      // For now, let's just ensure it doesn't throw.
+      const s = Series.int32([1, 2]);
+      s.print();
+    });
+  });
 });

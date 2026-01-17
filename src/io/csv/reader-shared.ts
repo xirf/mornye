@@ -1,12 +1,15 @@
-import { inferColumnType } from './inference';
-import { BYTES, type ResolvedCsvOptions } from './options';
-import { createLazyStringColumn, type LazyStringColumn } from '../../core/series/lazy-string';
+import { type LazyStringColumn, createLazyStringColumn } from '../../core/series/lazy-string';
 import type { DTypeKind, Schema } from '../../core/types';
 import { createDateTimeParser } from '../datetime';
+import { inferColumnType } from './inference';
+import { BYTES, type ResolvedCsvOptions } from './options';
 
 export type DateTimeParser = ((value: string) => number) | null;
 
-export function buildDateTimeParsers(headers: string[], opts: ResolvedCsvOptions): DateTimeParser[] {
+export function buildDateTimeParsers(
+  headers: string[],
+  opts: ResolvedCsvOptions,
+): DateTimeParser[] {
   const parsers: DateTimeParser[] = [];
   for (const header of headers) {
     const cfg = opts.datetime.columns.get(header);
@@ -14,7 +17,9 @@ export function buildDateTimeParsers(headers: string[], opts: ResolvedCsvOptions
       parsers.push(null);
       continue;
     }
-    parsers.push(createDateTimeParser(cfg.format, cfg.offsetMinutes ?? opts.datetime.defaultOffsetMinutes));
+    parsers.push(
+      createDateTimeParser(cfg.format, cfg.offsetMinutes ?? opts.datetime.defaultOffsetMinutes),
+    );
   }
   return parsers;
 }
@@ -43,7 +48,11 @@ export function computeLineStarts(buffer: Buffer, len: number): number[] {
   return lineStarts;
 }
 
-export function computeLogicalRowStarts(bytes: Uint8Array, bufferLen: number, quote: number): number[] {
+export function computeLogicalRowStarts(
+  bytes: Uint8Array,
+  bufferLen: number,
+  quote: number,
+): number[] {
   const starts: number[] = [];
   let pos = 0;
   let inQuotes = false;
@@ -72,7 +81,12 @@ export function computeLogicalRowStarts(bytes: Uint8Array, bufferLen: number, qu
   return starts;
 }
 
-export function hasEscapedQuotes(bytes: Uint8Array, start: number, end: number, quote: number): boolean {
+export function hasEscapedQuotes(
+  bytes: Uint8Array,
+  start: number,
+  end: number,
+  quote: number,
+): boolean {
   for (let i = start; i < end - 1; i++) {
     if (bytes[i] === quote && bytes[i + 1] === quote) return true;
   }

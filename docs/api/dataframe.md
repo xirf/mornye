@@ -10,8 +10,8 @@ Create from column objects:
 
 ```typescript
 const df = DataFrame.fromColumns({
-  name: ['Alice', 'Bob'],
-  age: [25, 30]
+  name: ["Alice", "Bob"],
+  age: [25, 30],
 });
 ```
 
@@ -58,6 +58,8 @@ Create an empty DataFrame with a schema.
 | Method          | Description        |
 | --------------- | ------------------ |
 | `groupby(cols)` | Group by column(s) |
+
+`GroupBy` aggregations: `agg({ col: op })`, `sum(cols)`, `mean(cols)`, `count()`. Supported ops: `sum`, `mean`, `min`, `max`, `count`, `first`, `last`.
 
 ### Transformation
 

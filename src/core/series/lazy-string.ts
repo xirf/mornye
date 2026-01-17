@@ -36,9 +36,5 @@ export function createLazyStringColumn(
 }
 
 export function isLazyStringColumn(value: unknown): value is LazyStringColumn {
-  return (
-    !!value &&
-    typeof value === 'object' &&
-    (value as LazyStringColumn).kind === 'lazy-string'
-  );
+  return !!value && typeof value === 'object' && (value as LazyStringColumn).kind === 'lazy-string';
 }

@@ -7,7 +7,10 @@ const MS_PER_MINUTE = 60_000;
  * Create a lightweight datetime parser function for a given format and offset.
  * Returns epoch milliseconds or NaN on failure.
  */
-export function createDateTimeParser(format: DateTimeFormat, offsetMinutes: number): (value: string) => number {
+export function createDateTimeParser(
+  format: DateTimeFormat,
+  offsetMinutes: number,
+): (value: string) => number {
   switch (format) {
     case 'unix-ms':
       return (value: string) => {
@@ -23,7 +26,6 @@ export function createDateTimeParser(format: DateTimeFormat, offsetMinutes: numb
       return (value: string) => parseIsoLike(value, offsetMinutes, { allowTime: false });
     case 'sql':
       return (value: string) => parseIsoLike(value, offsetMinutes, { separator: ' ' });
-    case 'iso':
     default:
       return (value: string) => parseIsoLike(value, offsetMinutes, { separator: 'T' });
   }
@@ -45,8 +47,8 @@ function parseIsoLike(value: string, defaultOffsetMinutes: number, opts: IsoPars
 
   // Date portion YYYY-MM-DD
   const year = toInt(trimmed, 0, 4);
-  const month = expectChar(trimmed, 4, '-') ? toInt(trimmed, 5, 7) : NaN;
-  const day = expectChar(trimmed, 7, '-') ? toInt(trimmed, 8, 10) : NaN;
+  const month = expectChar(trimmed, 4, '-') ? toInt(trimmed, 5, 7) : Number.NaN;
+  const day = expectChar(trimmed, 7, '-') ? toInt(trimmed, 8, 10) : Number.NaN;
   if (!isValidDateParts(year, month, day)) return Number.NaN;
 
   let hour = 0;
@@ -58,7 +60,9 @@ function parseIsoLike(value: string, defaultOffsetMinutes: number, opts: IsoPars
   if (hasTime) {
     let timePos = sepIdx + 1;
     hour = toInt(trimmed, timePos, timePos + 2);
-    minute = expectChar(trimmed, timePos + 2, ':') ? toInt(trimmed, timePos + 3, timePos + 5) : NaN;
+    minute = expectChar(trimmed, timePos + 2, ':')
+      ? toInt(trimmed, timePos + 3, timePos + 5)
+      : Number.NaN;
     timePos += 5;
 
     if (Number.isNaN(hour) || Number.isNaN(minute)) return Number.NaN;
@@ -72,7 +76,11 @@ function parseIsoLike(value: string, defaultOffsetMinutes: number, opts: IsoPars
       // Optional fractional seconds
       if (trimmed[timePos] === '.') {
         let fracEnd = timePos + 1;
-        while (fracEnd < trimmed.length && isDigit(trimmed.charCodeAt(fracEnd)) && fracEnd - timePos <= 4) {
+        while (
+          fracEnd < trimmed.length &&
+          isDigit(trimmed.charCodeAt(fracEnd)) &&
+          fracEnd - timePos <= 4
+        ) {
           fracEnd++;
         }
         millis = toInt(trimmed, timePos + 1, fracEnd);

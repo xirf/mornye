@@ -1,10 +1,15 @@
 import { DataFrame } from '../../core/dataframe';
 import { Series } from '../../core/series';
-import { createLazyStringColumn, isLazyStringColumn, type LazyStringColumn } from '../../core/series/lazy-string';
+import {
+  type LazyStringColumn,
+  createLazyStringColumn,
+  isLazyStringColumn,
+} from '../../core/series/lazy-string';
 import type { DTypeKind, Schema } from '../../core/types';
 import { BYTES, type ResolvedCsvOptions } from './options';
 import { type CsvReadResult, type ParseFailures, createParseFailures } from './parse-result';
 import {
+  type DateTimeParser,
   applyDateTimeSchemaOverrides,
   buildDateTimeParsers,
   computeLogicalRowStarts,
@@ -15,7 +20,6 @@ import {
   parseIntFast,
   parseQuotedLine,
   storeLazyString,
-  type DateTimeParser,
 } from './reader-shared';
 
 /**
@@ -96,7 +100,7 @@ export async function readCsvWithHybridParser<S extends Schema = Schema>(
   for (let col = 0; col < numCols; col++) {
     const dtype = schema[headers[col]!];
     const isDatetime = datetimeParsers[col] !== null;
-    colTypes[col] = isDatetime ? 'float64' : dtype?.kind ?? 'string';
+    colTypes[col] = isDatetime ? 'float64' : (dtype?.kind ?? 'string');
 
     switch (colTypes[col]) {
       case 'float64':

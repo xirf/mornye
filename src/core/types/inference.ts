@@ -1,5 +1,5 @@
-import type { DType, DTypeKind } from './dtype';
 import type { LazyStringColumn } from '../series/lazy-string';
+import type { DType, DTypeKind } from './dtype';
 
 /**
  * Mapping of DTypeKind to TypeScript definition.

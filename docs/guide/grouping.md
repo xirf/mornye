@@ -5,26 +5,35 @@
 Group rows by column values:
 
 ```typescript
-const byCategory = df.groupby('category');
+const byCategory = df.groupby("category");
 ```
 
 ## Aggregations
 
 ```typescript
-// Count per group
-const counts = df.groupby('category').count();
+// Count per group (rows)
+const counts = df.groupby("category").count();
 
-// Sum per group
-const totals = df.groupby('region').sum('revenue');
+// Quick helpers
+const totals = df.groupby("region").sum("revenue");
+const averages = df.groupby("department").mean("salary");
 
-// Mean per group
-const averages = df.groupby('department').mean('salary');
+// Flexible: mix aggregations per column
+const summary = df.groupby("category").agg({
+  revenue: "sum",
+  quantity: "mean",
+  price: "max",
+  first_seen: "first",
+  last_seen: "last",
+});
 ```
+
+Supported aggregation ops: `sum`, `mean`, `min`, `max`, `count`, `first`, `last`.
 
 ## Multiple Groups
 
 ```typescript
-const nested = df.groupby(['year', 'month']).sum('sales');
+const nested = df.groupby(["year", "month"]).sum("sales");
 ```
 
 ## Describe
@@ -36,6 +45,7 @@ df.describe().print();
 ```
 
 Output:
+
 ```
 ┌───────┬───────────┬───────────┬───────────┐
 │       │ age       │ salary    │ score     │
@@ -55,5 +65,5 @@ Output:
 const unique = df.unique();
 
 // Unique values in a column
-const categories = df.col('category').unique();
+const categories = df.col("category").unique();
 ```

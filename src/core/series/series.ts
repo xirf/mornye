@@ -1,9 +1,9 @@
 import { TypeMismatchError } from '../../errors';
 import type { DType, DTypeKind, InferDType, StorageType } from '../types';
 import type { ISeries } from './interface';
+import { type LazyStringColumn, createLazyStringColumn, isLazyStringColumn } from './lazy-string';
 import { createStorageFrom } from './storage';
 import { StringAccessor } from './string-accessor';
-import { createLazyStringColumn, isLazyStringColumn, type LazyStringColumn } from './lazy-string';
 
 /**
  * Series - A typed 1D array with Pandas-like operations.
@@ -34,7 +34,7 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
     this._data = data;
     this._offset = offset;
     const dataLen = isLazyStringColumn(data)
-      ? data.codes?.length ?? data.offsets?.length ?? data.cache.length
+      ? (data.codes?.length ?? data.offsets?.length ?? data.cache.length)
       : (data as { length: number }).length;
     this._len = length ?? Math.max(0, dataLen - offset);
     this.length = this._len;
@@ -73,7 +73,12 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
    * Creates a lazily decoded string Series from a shared buffer.
    */
   static stringLazy(data: LazyStringColumn): Series<'string'> {
-    return new Series<'string'>({ kind: 'string', nullable: false }, data as StorageType<'string'>, 0, data.codes?.length ?? data.offsets.length ?? data.cache.length);
+    return new Series<'string'>(
+      { kind: 'string', nullable: false },
+      data as StorageType<'string'>,
+      0,
+      data.codes?.length ?? data.offsets.length ?? data.cache.length,
+    );
   }
 
   /**
@@ -109,7 +114,7 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
       const col = this._data;
 
       if (col.codes && col.dict) {
-        const code:any = col.codes[baseIndex];
+        const code: number = col.codes[baseIndex]!;
         return col.dict[code] as InferDType<DType<T>>;
       }
 
@@ -809,7 +814,7 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
   _storage(): StorageType<T> {
     // Get the data length, handling LazyStringColumn case
     const dataLen = isLazyStringColumn(this._data)
-      ? this._data.codes?.length ?? this._data.offsets?.length ?? this._data.cache.length
+      ? (this._data.codes?.length ?? this._data.offsets?.length ?? this._data.cache.length)
       : (this._data as { length: number }).length;
 
     // Return a view if using offset, otherwise return the data directly

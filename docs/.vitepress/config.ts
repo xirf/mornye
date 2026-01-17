@@ -46,6 +46,16 @@ export default defineConfig({
             { text: 'Grouping & Aggregation', link: '/guide/grouping' },
           ],
         },
+        {
+          text: 'Usage Guides',
+          items: [
+            { text: 'Common Recipes', link: '/guide/recipes' },
+            { text: 'Performance Guide', link: '/guide/performance' },
+            { text: 'Migration Guide', link: '/guide/migration' },
+            { text: 'Best Practices', link: '/guide/best-practices' },
+            { text: 'Troubleshooting', link: '/guide/troubleshooting' },
+          ],
+        },
       ],
       '/api/': [
         {

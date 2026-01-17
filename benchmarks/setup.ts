@@ -7,8 +7,8 @@
  * Get your API token from: https://www.kaggle.com/settings/account
  */
 
-import { $ } from 'bun';
 import { mkdir } from 'node:fs/promises';
+import { $ } from 'bun';
 
 const pathJoin = (...parts: string[]) => parts.join('/');
 const DATA_DIR = pathJoin(process.cwd(), 'benchmarks', 'data');
