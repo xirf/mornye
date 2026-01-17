@@ -9,7 +9,7 @@ describe('CSV Writer', () => {
   afterAll(async () => {
     const file = Bun.file(testPath);
     if (await file.exists()) {
-      await Bun.$`rm ${testPath}`;
+      await file.delete().catch(() => {});
     }
   });
 

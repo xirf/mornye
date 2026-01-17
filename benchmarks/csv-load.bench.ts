@@ -5,7 +5,6 @@
  * Uses real-world Online Retail II dataset.
  */
 
-import * as fs from 'node:fs';
 import { bench, group, run } from 'mitata';
 import { readCsv } from '../src';
 import { ensureDataset } from './setup';
@@ -14,15 +13,15 @@ import { ensureDataset } from './setup';
 const dataset2010 = await ensureDataset('retail-2010');
 const dataset2011 = await ensureDataset('retail-2011');
 
-console.log('\n📊 CSV Loading Benchmarks (Real World Data)\n');
+console.log('\n📊 CSV Read Benchmarks\n');
 console.log('='.repeat(60));
 
 // Warm up
 await readCsv(dataset2010);
 
 group('Retail 2009-2010 (~44MB)', () => {
-  bench('raw fs.readFileSync', () => {
-    const content = fs.readFileSync(dataset2010, 'utf-8');
+  bench('raw Bun.file.text', async () => {
+    const content = await Bun.file(dataset2010).text();
     const lines = content.split('\n');
     return lines.length;
   });
@@ -34,8 +33,8 @@ group('Retail 2009-2010 (~44MB)', () => {
 });
 
 group('Retail 2010-2011 (~45MB)', () => {
-  bench('raw fs.readFileSync', () => {
-    const content = fs.readFileSync(dataset2011, 'utf-8');
+  bench('raw Bun.file.text', async () => {
+    const content = await Bun.file(dataset2011).text();
     const lines = content.split('\n');
     return lines.length;
   });

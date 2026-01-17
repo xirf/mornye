@@ -3,6 +3,7 @@ import type { DType, DTypeKind, InferDType, StorageType } from '../types';
 import type { ISeries } from './interface';
 import { createStorageFrom } from './storage';
 import { StringAccessor } from './string-accessor';
+import { createLazyStringColumn, isLazyStringColumn, type LazyStringColumn } from './lazy-string';
 
 /**
  * Series - A typed 1D array with Pandas-like operations.
@@ -32,7 +33,10 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
     this.dtype = dtype;
     this._data = data;
     this._offset = offset;
-    this._len = length ?? data.length - offset;
+    const dataLen = isLazyStringColumn(data)
+      ? data.codes?.length ?? data.offsets?.length ?? data.cache.length
+      : (data as { length: number }).length;
+    this._len = length ?? Math.max(0, dataLen - offset);
     this.length = this._len;
   }
 
@@ -66,6 +70,13 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
   }
 
   /**
+   * Creates a lazily decoded string Series from a shared buffer.
+   */
+  static stringLazy(data: LazyStringColumn): Series<'string'> {
+    return new Series<'string'>({ kind: 'string', nullable: false }, data as StorageType<'string'>, 0, data.codes?.length ?? data.offsets.length ?? data.cache.length);
+  }
+
+  /**
    * Creates a boolean Series.
    */
   static bool(data: boolean[]): Series<'bool'> {
@@ -92,11 +103,35 @@ export class Series<T extends DTypeKind> implements ISeries<T> {
     if (index < 0 || index >= this._len) {
       return undefined;
     }
-    const value = this._data[this._offset + index];
+    const baseIndex = this._offset + index;
+    const value = (this._data as StorageType<T>)[baseIndex];
 
     // Convert bool storage (0/1) to boolean
     if (this.dtype.kind === 'bool') {
       return (value === 1) as InferDType<DType<T>>;
+    }
+
+    if (this.dtype.kind === 'string' && isLazyStringColumn(this._data)) {
+      const col = this._data;
+
+      if (col.codes && col.dict) {
+        const code = col.codes[baseIndex];
+        return col.dict[code] as InferDType<DType<T>>;
+      }
+
+      const cached = col.cache[baseIndex];
+      if (cached !== null && cached !== undefined) return cached as InferDType<DType<T>>;
+
+      const start = col.offsets[baseIndex];
+      const len = col.lengths[baseIndex];
+      let str = col.buffer.toString('utf-8', start, start + len);
+
+      if (col.needsUnescape && col.needsUnescape[baseIndex] === 1 && str.indexOf('"') !== -1) {
+        str = str.replace(/""/g, '"');
+      }
+
+      col.cache[baseIndex] = str;
+      return str as InferDType<DType<T>>;
     }
 
     return value as InferDType<DType<T>>;

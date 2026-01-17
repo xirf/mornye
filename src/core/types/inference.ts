@@ -1,4 +1,5 @@
 import type { DType, DTypeKind } from './dtype';
+import type { LazyStringColumn } from '../series/lazy-string';
 
 /**
  * Mapping of DTypeKind to TypeScript definition.
@@ -25,7 +26,7 @@ export type StorageType<T extends DTypeKind> = T extends 'float64'
   : T extends 'int32'
     ? Int32Array
     : T extends 'string'
-      ? string[]
+      ? string[] | LazyStringColumn
       : T extends 'bool'
         ? Uint8Array
         : never;

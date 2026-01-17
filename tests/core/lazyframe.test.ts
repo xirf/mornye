@@ -1,16 +1,14 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdir } from 'node:fs/promises';
 import { scanCsv } from '../../src/io/csv';
 
-const TEST_DIR = join(import.meta.dir, '..', 'fixtures');
-const LAZY_CSV_PATH = join(TEST_DIR, 'lazy-test.csv');
+const pathJoin = (...parts: string[]) => parts.join('/');
+const TEST_DIR = pathJoin(import.meta.dir, '..', 'fixtures');
+const LAZY_CSV_PATH = pathJoin(TEST_DIR, 'lazy-test.csv');
 
 // Create test CSV file
-beforeAll(() => {
-  if (!existsSync(TEST_DIR)) {
-    mkdirSync(TEST_DIR, { recursive: true });
-  }
+beforeAll(async () => {
+  await mkdir(TEST_DIR, { recursive: true });
 
   // Create a larger test file with 1000 rows
   const headers = 'id,name,price,quantity,active\n';
@@ -18,14 +16,13 @@ beforeAll(() => {
   for (let i = 1; i <= 1000; i++) {
     rows.push(`${i},Product${i},${(i * 1.5).toFixed(2)},${i * 10},${i % 2 === 0}`);
   }
-  writeFileSync(LAZY_CSV_PATH, headers + rows.join('\n'));
+  await Bun.write(LAZY_CSV_PATH, headers + rows.join('\n'));
 });
 
-afterAll(() => {
-  try {
-    unlinkSync(LAZY_CSV_PATH);
-  } catch {
-    // Ignore if file doesn't exist
+afterAll(async () => {
+  const file = Bun.file(LAZY_CSV_PATH);
+  if (await file.exists()) {
+    await file.delete().catch(() => {});
   }
 });
 

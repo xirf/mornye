@@ -7,19 +7,19 @@
  * Get your API token from: https://www.kaggle.com/settings/account
  */
 
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { $ } from 'bun';
+import { mkdir } from 'node:fs/promises';
 
-const DATA_DIR = path.join(process.cwd(), 'benchmarks', 'data');
+const pathJoin = (...parts: string[]) => parts.join('/');
+const DATA_DIR = pathJoin(process.cwd(), 'benchmarks', 'data');
 
 /**
  * Download dataset from Kaggle using kaggle CLI.
  */
 async function downloadFromKaggle(dataset: string, filename: string): Promise<string> {
-  const filepath = path.join(DATA_DIR, filename);
+  const filepath = pathJoin(DATA_DIR, filename);
 
-  if (fs.existsSync(filepath)) {
+  if (await Bun.file(filepath).exists()) {
     console.log(`✓ ${filename} already exists`);
     return filepath;
   }
@@ -92,16 +92,14 @@ export type DatasetName = 'retail-2010' | 'retail-2011' | 'synthetic-100k';
 
 export async function ensureDataset(name: DatasetName): Promise<string> {
   // Create data directory
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
+  await mkdir(DATA_DIR, { recursive: true });
 
   // Handle Kaggle real datasets
   if (name === 'retail-2010' || name === 'retail-2011') {
     const filename = name === 'retail-2010' ? 'Year 2009-2010.csv' : 'Year 2010-2011.csv';
-    const filepath = path.join(DATA_DIR, filename);
+    const filepath = pathJoin(DATA_DIR, filename);
 
-    if (fs.existsSync(filepath)) {
+    if (await Bun.file(filepath).exists()) {
       return filepath;
     }
 
@@ -115,7 +113,7 @@ export async function ensureDataset(name: DatasetName): Promise<string> {
 
     // Fallback if download fails (shouldn't happen on local since we have files)
     console.log(`⚠️  Could not find real dataset ${filename}. Generating synthetic...`);
-    const fallbackPath = path.join(DATA_DIR, `synthetic-${name}.csv`);
+    const fallbackPath = pathJoin(DATA_DIR, `synthetic-${name}.csv`);
     await generateSyntheticDataset(500000, fallbackPath);
     return fallbackPath;
   }
@@ -123,8 +121,8 @@ export async function ensureDataset(name: DatasetName): Promise<string> {
   // Handle synthetic datasets
   if (name === 'synthetic-100k') {
     const rows = 100000;
-    const filepath = path.join(DATA_DIR, 'synthetic-100k.csv');
-    if (fs.existsSync(filepath)) return filepath;
+    const filepath = pathJoin(DATA_DIR, 'synthetic-100k.csv');
+    if (await Bun.file(filepath).exists()) return filepath;
 
     console.log(`📥 Generating ${rows.toLocaleString()} row synthetic dataset...`);
     await generateSyntheticDataset(rows, filepath);

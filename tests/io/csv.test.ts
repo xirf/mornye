@@ -19,7 +19,7 @@ Carol,22,91.8,true
     // Cleanup
     const file = Bun.file(testCsvPath);
     if (await file.exists()) {
-      await Bun.$`rm ${testCsvPath}`;
+      await file.delete().catch(() => {});
     }
   });
 
@@ -105,7 +105,7 @@ Line2"
   afterAll(async () => {
     const file = Bun.file(quotedCsvPath);
     if (await file.exists()) {
-      await Bun.$`rm ${quotedCsvPath}`;
+      await file.delete().catch(() => {});
     }
   });
 
@@ -128,5 +128,38 @@ Line2"
     const descriptions = df.col('description');
 
     expect(descriptions.at(2)).toBe('Line1\nLine2');
+  });
+});
+
+describe('Lazy string storage edge cases', () => {
+  const lazyCsvPath = './tests/fixtures/lazy-edge.csv';
+  const lazyContent = `name,comment
+foo,"Ends with escaped quote """""
+bar,"multibyte 😀 € and ""quote"" inside"
+`;
+
+  beforeAll(async () => {
+    await Bun.write(lazyCsvPath, lazyContent);
+  });
+
+  afterAll(async () => {
+    const file = Bun.file(lazyCsvPath);
+    if (await file.exists()) {
+      await file.delete().catch(() => {});
+    }
+  });
+
+  test('handles escaped quotes at end-of-line', async () => {
+    const { df } = await readCsv(lazyCsvPath);
+    const comments = df.col('comment');
+
+    expect(comments.at(0)).toBe('Ends with escaped quote ""');
+  });
+
+  test('handles multibyte UTF-8 with escapes', async () => {
+    const { df } = await readCsv(lazyCsvPath);
+    const comments = df.col('comment');
+
+    expect(comments.at(1)).toBe('multibyte 😀 € and "quote" inside');
   });
 });

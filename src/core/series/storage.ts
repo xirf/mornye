@@ -1,5 +1,6 @@
 import { SchemaError } from '../../errors';
 import type { DTypeKind, StorageType } from '../types';
+import type { LazyStringColumn } from './lazy-string';
 
 /**
  * Maps DTypeKind to its TypedArray constructor.

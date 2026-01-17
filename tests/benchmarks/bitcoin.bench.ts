@@ -9,12 +9,11 @@
  * Usage: bun run bench
  */
 
-import * as path from 'node:path';
 import { $ } from 'bun';
 import { readCsv } from '../../src';
 
 const RUNS = 3;
-const DATA_FILE = path.join(process.cwd(), 'artifac', 'btcusd_1-min_data.csv');
+const DATA_FILE = `${process.cwd()}/artifac/btcusd_1-min_data.csv`;
 
 async function benchmarkMornyeBun(filePath: string, runs: number): Promise<number[]> {
   const times: number[] = [];
