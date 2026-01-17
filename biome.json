@@ -27,6 +27,14 @@
     }
   },
   "files": {
-    "ignore": ["node_modules", "dist", "bun.lock", "artifac", ".vitepress/cache", ".server"]
+    "ignore": [
+      "node_modules",
+      "dist",
+      "bun.lock",
+      "artifacts",
+      ".vitepress/cache",
+      ".server",
+      "docs/.vitepress/theme/custom.css"
+    ]
   }
 }

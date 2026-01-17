@@ -1,10 +1,25 @@
+import UnoCSS from 'unocss/vite';
 import { defineConfig } from 'vitepress';
+import llmstxt from 'vitepress-plugin-llms';
 
 export default defineConfig({
   title: 'Mornye',
   description: 'Ergonomic data analysis for TypeScript',
   head: [['link', { rel: 'icon', href: '/logo.png' }]],
-
+  vite: {
+    plugins: [
+      UnoCSS(),
+      process.env.NODE_ENV === 'production'
+        ? llmstxt({
+            description: 'Ergonomic data analysis for TypeScript',
+            details: 'Ergonomic data analysis for TypeScript',
+            ignoreFiles: ['index.md', 'table-of-content.md', 'blog/*', 'public/*'],
+            domain: 'https://mornye.andka.id',
+          })
+        : undefined,
+    ],
+  },
+  sitemap: { hostname: 'https://mornye.andka.id' },
   themeConfig: {
     logo: '/logo.png',
 
