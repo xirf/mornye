@@ -49,5 +49,9 @@
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "@shikijs/vitepress-twoslash": "^3.21.0",
+    "shiki": "^3.21.0"
   }
 }

@@ -6,71 +6,37 @@ const activeTab = ref<SampleKey>('csv');
 const copied = ref(false);
 
 const tabs = [
-  { id: 'csv', label: 'CSV Loading' },
-  { id: 'filtering', label: 'Filtering' },
-  { id: 'groupby', label: 'GroupBy' },
-  { id: 'types', label: 'Type-Safety' },
+    { id: 'csv', label: 'CSV Loading' },
+    { id: 'filtering', label: 'Filtering' },
+    { id: 'groupby', label: 'GroupBy' },
+    { id: 'types', label: 'Type-Safety' },
 ];
 
 const codeSamples = {
-  csv: {
-    code: `import { readCsv } from 'molniya';
-
-// Blazing fast SIMD-accelerated reading
-const { df } = await readCsv('bitcoin_7m_rows.csv', {
-  delimiter: ',',
-  hasHeader: true
-});
-
-console.log(df.shape); // [7381118, 8]
-console.log(df.head(5));`,
-    output: '✓ Loaded 7,381,118 rows in 1.28s\n[7381118, 8] DataFrame',
-  },
-  filtering: {
-    code: `// Expressive filtering
-const filtered = df
-  .where(col => col("price").gt(50000))
-  .select("timestamp", "price", "volume");
-
-console.log(filtered.shape);
-filtered.print();`,
-    output:
-      '✓ Filtered to 1,240,512 rows\n┌───────┬───────────┬──────────┐\n│ index │ price     │ volume   │\n├───────┼───────────┼──────────┤\n│ 0     │ 50421.12  │ 1.24     │\n└───────┴───────────┴──────────┘',
-  },
-  groupby: {
-    code: `// SQL-like aggregations
-const summary = df
-  .groupby("category")
-  .agg({
-    price: "mean",
-    quantity: "sum"
-  });
-
-summary.print();`,
-    output:
-      '┌──────────┬───────────┬──────────┐\n│ category │ price_avg │ qty_sum  │\n├──────────┼───────────┼──────────┤\n│ retail   │ 15.42     │ 1420     │\n└──────────┴───────────┴──────────┘',
-  },
-  types: {
-    code: `// Full IDE support
-const df = await readCsv<Schema>("data.csv");
-
-// Error: Column 'non_existent' not found in Schema
-df.col("non_existent").mean();
-
-// Success: Auto-complete working
-df.col("price").std();`,
-    output: 'TS2345: Argument of type \'"non_existent"\' is not assignable...',
-  },
+    csv: {
+        output: '✓ Loaded 7,381,118 rows in 1.28s\n[7381118, 8] DataFrame',
+    },
+    filtering: {
+        output:
+            '✓ Filtered to 1,240,512 rows\n┌───────┬───────────┬──────────┐\n│ index │ price     │ volume   │\n├───────┼───────────┼──────────┤\n│ 0     │ 50421.12  │ 1.24     │\n└───────┴───────────┴──────────┘',
+    },
+    groupby: {
+        output:
+            '┌──────────┬───────────┬──────────┐\n│ category │ price_avg │ qty_sum  │\n├──────────┼───────────┼──────────┤\n│ retail   │ 15.42     │ 1420     │\n└──────────┴───────────┴──────────┘',
+    },
+    types: {
+        output: 'TS2345: Argument of type \'"non_existent"\' is not assignable...',
+    },
 } as const;
 
 type SampleKey = keyof typeof codeSamples;
 
 const copyInstall = () => {
-  navigator.clipboard.writeText('bun add molniya');
-  copied.value = true;
-  setTimeout(() => {
-    copied.value = false;
-  }, 2000);
+    navigator.clipboard.writeText('bun add molniya');
+    copied.value = true;
+    setTimeout(() => {
+        copied.value = false;
+    }, 2000);
 };
 </script>
 
@@ -123,11 +89,9 @@ const copyInstall = () => {
                     </div>
 
                     <!-- Code Area -->
-                    <div class="p-6 bg-[#0d1117] min-h-[300px]">
-                        <pre
-                            class="font-mono text-sm leading-relaxed overflow-x-auto"><code class="language-typescript" v-html="codeSamples[activeTab].code.replace(/</g, '&lt;').replace(/>/g, '&gt;')"></code></pre>
+                    <div class="code-area p-6 bg-[#0d1117] min-h-[300px] text-sm leading-relaxed overflow-x-auto">
+                        <slot :name="activeTab"></slot>
                     </div>
-
                     <!-- Output Area -->
                     <div class="bg-[#090c10] border-t border-slate-800 p-4 font-mono text-sm">
                         <div class="flex items-center gap-2 text-slate-500 mb-2 text-xs uppercase tracking-wider">

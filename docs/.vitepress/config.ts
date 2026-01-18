@@ -1,6 +1,8 @@
 import UnoCSS from 'unocss/vite';
 import { defineConfig } from 'vitepress';
 import llmstxt from 'vitepress-plugin-llms';
+import { transformerTwoslash } from '@shikijs/vitepress-twoslash';
+import { createFileSystemTypesCache } from '@shikijs/vitepress-twoslash/cache-fs';
 
 export default defineConfig({
   title: 'Molniya',
@@ -17,6 +19,20 @@ export default defineConfig({
             domain: 'https://molniya.andka.id',
           })
         : undefined,
+    ],
+  },
+  markdown: {
+    codeTransformers: [
+      transformerTwoslash({
+        typesCache: createFileSystemTypesCache(),
+        twoslashOptions: {
+          compilerOptions: {
+            paths: {
+              "molniya": ["./src/index.ts"]
+            }
+          }
+        }
+      })
     ],
   },
   sitemap: { hostname: 'https://molniya.andka.id' },

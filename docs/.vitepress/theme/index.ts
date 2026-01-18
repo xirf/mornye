@@ -1,6 +1,8 @@
 import DefaultTheme from 'vitepress/theme';
 import type { App } from 'vue';
 import 'virtual:uno.css';
+import '@shikijs/vitepress-twoslash/style.css';
+import TwoslashFloating from '@shikijs/vitepress-twoslash/client';
 import './custom.css';
 import EYN from '../components/EYN.vue';
 import Hero from '../components/Hero.vue';
@@ -12,6 +14,7 @@ export default {
   extends: DefaultTheme,
   Layout,
   enhanceApp({ app }: { app: App }) {
+    app.use(TwoslashFloating);
     app.component('Ray', Ray);
     app.component('Hero', Hero);
     app.component('EYN', EYN);

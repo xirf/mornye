@@ -30,12 +30,8 @@ import { ChartSpline, Code2, Cpu, Shield, Table, Zap } from 'lucide-vue-next';
                         Get full autocomplete and compile-time checks for your column names and types.
                     </p>
                     <div
-                        class="bg-gray-100 dark:bg-slate-800/50 rounded-lg p-3 font-mono text-xs text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700/50">
-                        <span class="text-indigo-600 dark:text-indigo-400">const</span> df = <span
-                            class="text-yellow-600 dark:text-yellow-400">readCsv</span>(<span
-                            class="text-green-600 dark:text-green-400">"data.csv"</span>);<br />
-                        <span class="text-slate-400">// df.col("invalid") ➔ Error!</span><br />
-                        <span class="text-slate-400">// df.col("price").sum() ➔ Correctly typed</span>
+                        class="bg-gray-100 dark:bg-slate-800/50 rounded-lg p-3 text-xs border border-slate-200 dark:border-slate-700/50 [&>pre]:!bg-transparent [&>pre]:!p-0 [&>pre]:!m-0 [&_code]:!font-mono">
+                        <slot />
                     </div>
                 </div>
 
@@ -45,7 +41,7 @@ import { ChartSpline, Code2, Cpu, Shield, Table, Zap } from 'lucide-vue-next';
                         class="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4 text-emerald-400">
                         <Cpu />
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Blazing Fast I/O</h3>
+                    <h3 class="font-medium text-white mb-2">High-Throughput I/O</h3>
                     <p class="text-sm text-slate-600 dark:text-slate-400">
                         SIMD-accelerated line finding and direct byte parsing. 7.3M rows in <span
                             class="text-emerald-500 font-bold">1.2s</span>.
