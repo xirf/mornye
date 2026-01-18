@@ -35,4 +35,7 @@ export interface IDataFrame<S extends Schema> extends DataFrameView<S> {
 
   /** Format as string representation */
   toString(): string;
+
+  /** Convert to array of objects */
+  toArray(): InferSchema<S>[];
 }

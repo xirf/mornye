@@ -616,7 +616,7 @@ export class DataFrame<S extends Schema> implements IDataFrame<S> {
    * Returns a GroupBy object for aggregation.
    */
   groupby<K extends keyof S>(...columns: K[]): GroupBy<S, K> {
-    return new GroupBy(this, columns);
+    return new GroupBy(this, columns, DataFrame.fromColumns);
   }
 
   // Apply & Transform (delegated to operations.ts)
