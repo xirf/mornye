@@ -97,7 +97,7 @@ describe('Parse failure tracking', () => {
 });
 
 describe('CsvParser strategies', () => {
-  test('parses unquoted buffers with fast path', () => {
+  test('parses unquoted buffers with unquoted path', () => {
     const parser = new CsvParser();
     const buffer = Buffer.from('a,b\n1,2\n3,4');
     const rows = parser.parse(buffer);

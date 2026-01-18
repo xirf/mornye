@@ -15,9 +15,9 @@ import {
   computeLogicalRowStarts,
   decodeQuotedField,
   hasEscapedQuotes,
-  inferSchemaFast,
-  parseFloatFast,
-  parseIntFast,
+  inferSchemaOptimized,
+  parseFloatOptimized,
+  parseIntOptimized,
   parseQuotedLine,
   storeLazyString,
 } from './reader-shared';
@@ -89,7 +89,7 @@ export async function readCsvWithHybridParser<S extends Schema = Schema>(
     samples.push(parseQuotedLine(buffer, bytes, start, end, delimiter, quote));
   }
 
-  const schema: Schema = providedSchema ?? inferSchemaFast(headers, samples);
+  const schema: Schema = providedSchema ?? inferSchemaOptimized(headers, samples);
   applyDateTimeSchemaOverrides(schema, headers, datetimeParsers);
 
   const storage: (Float64Array | Int32Array | Uint8Array | string[] | LazyStringColumn)[] = [];
@@ -250,10 +250,10 @@ function parseQuotedRowIntoStorage(
       } else {
         switch (dtype) {
           case 'float64':
-            (store as Float64Array)[rowIdx] = parseFloatFast(bytes, s, e);
+            (store as Float64Array)[rowIdx] = parseFloatOptimized(bytes, s, e);
             break;
           case 'int32':
-            (store as Int32Array)[rowIdx] = parseIntFast(bytes, s, e);
+            (store as Int32Array)[rowIdx] = parseIntOptimized(bytes, s, e);
             break;
           case 'bool': {
             const first = s < e ? bytes[s]! : 0;

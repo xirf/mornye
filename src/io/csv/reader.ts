@@ -6,13 +6,18 @@ import { computeLineStarts } from './reader-shared';
 import { readCsvUnquoted, supportsUnquotedPath } from './reader-unquoted';
 
 /**
- * Ultra-fast CSV reader using optimized byte-level parsing.
+ * Reads a CSV file using Bun.js file system APIs.
  *
- * Two strategies:
- * 1. No quotes: Direct byte parsing with SIMD line-finding (~1.3s for 387MB)
- * 2. Has quotes: Byte-level quote-aware parsing without materializing string[][]
+ * This function parses the file content directly into typed arrays (Float64Array, Int32Array, etc.),
+ * bypassing intermediate string representations for numeric columns.
  *
- * Key optimization: Parses directly into typed arrays without intermediate string[][].
+ * It automatically selects between two parsing strategies:
+ * 1. Unquoted Path: For simple CSVs without quoted fields.
+ * 2. Hybrid Path: For CSVs containing quoted fields (RFC 4180 compliant).
+ *
+ * @param path - Absolute or relative path to the CSV file.
+ * @param options - Parsing options (delimiter, hasHeader, schema, etc.).
+ * @returns A promise resolving to the parsed DataFrame and any non-fatal errors.
  */
 export async function readCsv<S extends Schema = Schema>(
   path: string,
@@ -30,7 +35,7 @@ export async function readCsv<S extends Schema = Schema>(
   const len = buffer.length;
   const lineStarts = computeLineStarts(buffer, len);
 
-  // Quote-aware fallback when fast path is not supported
+  // Quote-aware fallback when unquoted path is not supported
   if (!supportsUnquotedPath(buffer)) {
     return readCsvWithHybridParser(buffer, bytes, lineStarts, opts, providedSchema, trackErrors);
   }

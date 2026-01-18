@@ -1,5 +1,8 @@
 <template>
     <Ray class="h-[60vh] -top-16 pointer-events-none opacity-[.35] dark:opacity-40" />
+    <svg>
+
+    </svg>
     <section
         class="z-10 relative flex w-full pt-6 md:pt-0 mb-16 md:mb-8 px-6 min-h-[80svh] items-center justify-center">
         <div class="flex flex-col text-center">
@@ -8,13 +11,14 @@
                 <p class="text-4xl xl:text-5xl mb-6 font-bold tracking-tight">Ergonomic data analysis for <span
                         class="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">TypeScript.</span>
                 </p>
-                <p
-                    class="text-xl md:text-2xl text-slate-500 dark:text-slate-400 leading-normal text-left w-full max-w-2xl md:text-center">
-                    A simple, typed DataFrame library. In-memory, zero dependencies, and blazing fast with SIMD line
-                    finding.</p>
+                <p class="text-lg text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+                    A pandas-like data analysis library for JavaScript. Type-safe by design, zero dependencies, and
+                    optimized with
+                    SIMD.
+                </p>
                 <section
                     class="flex flex-col sm:flex-row items-start sm:items-center w-full md:w-auto gap-4 mt-8 mb-12">
-                    <a class="text-white font-semibold text-lg bg-indigo-500 dark:bg-indigo-600 px-8 py-3 rounded-full hover:scale-105 active:scale-95 transition-transform"
+                    <a class="text-white font-semibold text-lg bg-indigo-500 dark:bg-indigo-600 px-8 py-3 rounded-full active:scale-95 transition-transform"
                         id="hero-get-started" href="/guide/getting-started">
                         Get Started
                     </a>
@@ -27,6 +31,7 @@
                 </section>
             </div>
         </div>
+
     </section>
 </template>
 
@@ -37,13 +42,13 @@ import Ray from './Ray.vue';
 
 const copied = ref(false);
 watch(copied, (value) => {
-  // [INFO] navigator.clipboard available only in secure contexts.
-  if (value && window.isSecureContext) {
-    navigator.clipboard.writeText('bun add molniya');
+    // [INFO] navigator.clipboard available only in secure contexts.
+    if (value && window.isSecureContext) {
+        navigator.clipboard.writeText('bun add molniya');
 
-    setTimeout(() => {
-      copied.value = false;
-    }, 2000);
-  }
+        setTimeout(() => {
+            copied.value = false;
+        }, 2000);
+    }
 });
 </script>

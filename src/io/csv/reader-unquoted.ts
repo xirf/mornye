@@ -12,14 +12,14 @@ import { hasQuotedFields } from './parser';
 import {
   applyDateTimeSchemaOverrides,
   buildDateTimeParsers,
-  inferSchemaFast,
-  parseFloatFast,
-  parseIntFast,
+  inferSchemaOptimized,
+  parseFloatOptimized,
+  parseIntOptimized,
   storeLazyString,
 } from './reader-shared';
 
 /**
- * Unquoted CSV path (fast) for files without quotes.
+ * Unquoted CSV path (optimized) for files without quotes.
  */
 export function readCsvUnquoted<S extends Schema = Schema>(
   buffer: Buffer,
@@ -74,7 +74,7 @@ export function readCsvUnquoted<S extends Schema = Schema>(
     samples.push(buffer.toString('utf-8', start, end).split(delimiter));
   }
 
-  const schema: Schema = providedSchema ?? inferSchemaFast(headers, samples);
+  const schema: Schema = providedSchema ?? inferSchemaOptimized(headers, samples);
   applyDateTimeSchemaOverrides(schema, headers, datetimeParsers);
 
   const storage: (Float64Array | Int32Array | Uint8Array | string[] | LazyStringColumn)[] = [];
@@ -132,10 +132,10 @@ export function readCsvUnquoted<S extends Schema = Schema>(
       } else {
         switch (dtype) {
           case 'float64':
-            (store as Float64Array)[rowIdx] = parseFloatFast(bytes, fieldStart, fieldEnd);
+            (store as Float64Array)[rowIdx] = parseFloatOptimized(bytes, fieldStart, fieldEnd);
             break;
           case 'int32':
-            (store as Int32Array)[rowIdx] = parseIntFast(bytes, fieldStart, fieldEnd);
+            (store as Int32Array)[rowIdx] = parseIntOptimized(bytes, fieldStart, fieldEnd);
             break;
           case 'bool':
             (store as Uint8Array)[rowIdx] =

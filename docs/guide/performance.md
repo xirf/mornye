@@ -4,7 +4,7 @@ Molniya is built for speed, but how you use it affects performance. Here is how 
 
 ## 1. Filter Early, Filter Often
 
-The fastest data to process is data you don't process. Reduce the dataset size as early as possible in your chain.
+The most efficient data to process is data you don't process. Reduce the dataset size as early as possible in your chain.
 
 **Bad:**
 ```typescript
@@ -18,7 +18,7 @@ df
 ```typescript
 df
   .filter(r => r.active)     // Drop 99% of rows immediately
-  .sort('date')              // Sorting only 10k rows (FAST)
+  .sort('date')              // Sorting only 10k rows (Efficient)
   .apply(complexMath);       // Calculating on 10k rows
 ```
 
@@ -44,7 +44,7 @@ Accessing data row-by-row is slower than column-based operations because of Java
 const total = df.rows().reduce((sum, row) => sum + row.price, 0);
 ```
 
-**Fast (Column-based):**
+**Column-based (Recommended):**
 ```typescript
 // Uses a tight loop over a typed array
 const total = df.col('price').sum();

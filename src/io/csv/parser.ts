@@ -4,7 +4,7 @@ import { BYTES } from './options';
  * Unified CSV parser that automatically selects the optimal algorithm.
  *
  * Strategies:
- * - No quotes detected: Uses SIMD line-finding + split (fast for clean data)
+ * - No quotes detected: Uses SIMD line-finding + split (unquoted path for clean data)
  * - Quotes detected: Uses hybrid line-by-line parsing (handles RFC 4180)
  *
  * @example
@@ -25,11 +25,11 @@ export class CsvParser {
 
   /**
    * Parse CSV buffer into rows.
-   * Automatically detects whether to use fast or hybrid parsing.
+   * Automatically detects whether to use optimized (unquoted) or hybrid parsing.
    */
   parse(buffer: Buffer): string[][] {
     const hasQuotes = buffer.indexOf(this.quote) !== -1;
-    return hasQuotes ? this.parseHybrid(buffer) : this.parseFast(buffer);
+    return hasQuotes ? this.parseHybrid(buffer) : this.parseUnquoted(buffer);
   }
 
   /**
@@ -53,10 +53,9 @@ export class CsvParser {
   }
 
   /**
-   * Fast path for CSVs without quotes.
-   * Uses SIMD-accelerated Buffer.indexOf + String.split.
+   * Optimized path for CSVs without quotes.
    */
-  private parseFast(buffer: Buffer): string[][] {
+  private parseUnquoted(buffer: Buffer): string[][] {
     const rows: string[][] = [];
     const len = buffer.length;
     const delimiterChar = String.fromCharCode(this.delimiter);
@@ -109,7 +108,7 @@ export class CsvParser {
         }
         lineStart = result.nextStart;
       } else {
-        // Fast path for this line
+        // Unquoted path for this line
         let lineEndClean = lineEnd;
         if (lineEndClean > lineStart && buffer[lineEndClean - 1] === BYTES.CR) {
           lineEndClean--;

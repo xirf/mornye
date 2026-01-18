@@ -190,7 +190,7 @@ export function decodeQuotedField(
   return str;
 }
 
-export function parseFloatFast(bytes: Uint8Array, start: number, end: number): number {
+export function parseFloatOptimized(bytes: Uint8Array, start: number, end: number): number {
   if (start >= end) return 0;
 
   let i = start;
@@ -226,7 +226,7 @@ export function parseFloatFast(bytes: Uint8Array, start: number, end: number): n
   return negative ? -result : result;
 }
 
-export function parseIntFast(bytes: Uint8Array, start: number, end: number): number {
+export function parseIntOptimized(bytes: Uint8Array, start: number, end: number): number {
   if (start >= end) return 0;
 
   let i = start;
@@ -247,7 +247,7 @@ export function parseIntFast(bytes: Uint8Array, start: number, end: number): num
   return negative ? -result : result;
 }
 
-export function inferSchemaFast(headers: string[], samples: string[][]): Schema {
+export function inferSchemaOptimized(headers: string[], samples: string[][]): Schema {
   const schema: Schema = {};
   for (let col = 0; col < headers.length; col++) {
     const columnSamples: string[] = [];

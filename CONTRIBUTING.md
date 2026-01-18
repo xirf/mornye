@@ -1,6 +1,6 @@
 # Contributing to Molniya
 
-Thank you for your interest in contributing to Molniya! We welcome contributions from the community to help make this the fastest JavaScript dataframe library.
+Thank you for your interest in contributing to Molniya! We welcome contributions from the community to help make this a high-performance JavaScript dataframe library.
 
 ## Getting Started
 

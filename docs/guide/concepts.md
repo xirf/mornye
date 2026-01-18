@@ -4,7 +4,7 @@ To use Molniya effectively, it helps to understand how it views your data. If yo
 
 ## The Mental Model
 
-Think of a **DataFrame** as a high-performance array of objects, but stored in a way that makes math and filtering incredibly fast.
+Think of a **DataFrame** as a high-performance array of objects, but stored in a way that makes math and filtering computationally efficient.
 
 ### DataFrame
 A `DataFrame` is a two-dimensional table with labeled columns.

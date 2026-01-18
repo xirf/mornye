@@ -1,7 +1,7 @@
 /**
  * Molniya - High-performance data manipulation for Bun.js
  *
- * A Pandas-like library leveraging Bun's speed with Elysia-style type inference.
+ * A Pandas-like library leveraging Bun's speed with ergonomic type inference.
  *
  * @example
  * ```ts
