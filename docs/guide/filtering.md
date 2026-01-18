@@ -33,7 +33,7 @@ const highScorers = df.where('score', 'gt', 80);
 ```
 
 > [!TIP]
-> **Performance Note**: For extremely large datasets, chaining `.where()` conditions can sometimes be faster than a complex `.filter()` callback, but for most use cases, use whichever is more readable.
+> **Performance Note**: For extremely large datasets, chaining `.where()` conditions can sometimes outperform a complex `.filter()` callback, but for most use cases, use whichever is more readable.
 
 ---
 

@@ -22,7 +22,7 @@
 Most JavaScript data libraries treat types as an afterthought. **Molniya** puts them first.
 
 - **🧠 True Type Inference:** It tracks your schema through filters, selects, and aggregations.
-- **⚡ Bun Native:** Built specifically to leverage Bun's fast I/O and runtime capabilities.
+- **⚡ Bun Native:** Built specifically to leverage Bun's high-performance I/O and runtime capabilities.
 - **🚀 SIMD Accelerated:** Uses low-level optimizations for line finding and parsing.
 - **📦 Zero Dependencies:** No bloat. No massive node_modules folder.
 
@@ -63,11 +63,11 @@ result.print();
 
 Molniya is built for speed, utilizing SIMD instructions for parsing.
 
-| Task              | Molniya   | Native Array |
-| :---------------- | :-------- | :----------- |
-| **Type Safety**   | ✅ Strict | ❌ Loose     |
-| **Memory Layout** | Columnar  | Row-based    |
-| **Dependencies**  | 0         | 0            |
+| Task              | Molniya  | Native Array |
+| :---------------- | :------- | :----------- |
+| **Type Safety**   | ✅ Strict | ❌ Loose      |
+| **Memory Layout** | Columnar | Row-based    |
+| **Dependencies**  | 0        | 0            |
 
 _(Detailed benchmarks against other libraries coming soon)_
 
