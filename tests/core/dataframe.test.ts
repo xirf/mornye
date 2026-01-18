@@ -171,7 +171,19 @@ describe('DataFrame', () => {
         { category: 'A', value: 30 },
       ]);
       const counts = df.groupby('category').count();
-      expect(counts.length).toBe(2);
+      expect(counts.shape[0]).toBe(2);
+    });
+
+    test('groupby.toString() returns summary', () => {
+      const df = DataFrame.from({ category: m.string(), value: m.int32() }, [
+        { category: 'A', value: 10 },
+        { category: 'B', value: 20 },
+      ]);
+      const grouped = df.groupby('category');
+      const str = grouped.toString();
+      expect(str).toContain('GroupBy');
+      expect(str).toContain('Columns: [category]');
+      expect(str).toContain('Groups: 2');
     });
 
     test('groupby().sum() sums by group', () => {
@@ -181,7 +193,7 @@ describe('DataFrame', () => {
         { category: 'A', value: 30 },
       ]);
       const sums = df.groupby('category').sum('value');
-      const aRow = sums.find((r) => r.category === 'A');
+      const aRow = sums.toArray().find((r) => r.category === 'A');
       expect(aRow?.value).toBe(40);
     });
   });

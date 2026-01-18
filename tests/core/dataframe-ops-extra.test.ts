@@ -118,7 +118,7 @@ describe('DataFrame extended operations', () => {
     expect(grouped.size).toBe(2);
 
     const minMax = grouped.agg({ v: 'max' });
-    const rowA = minMax.find((r) => r.g === 'A');
+    const rowA = minMax.toArray().find((r) => r.g === 'A');
     expect(rowA?.v).toBe(3);
 
     expect(() => grouped.agg({ v: 'median' as unknown as 'sum' })).toThrow(InvalidOperationError);
