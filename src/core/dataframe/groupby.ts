@@ -33,7 +33,7 @@ export type AggSchema<
   }
 >;
 
-// Simple definition for the factory to avoid circular types
+// biome-ignore lint/suspicious/noExplicitAny: Simple definition for the factory to avoid circular types
 type DataFrameFactory = (data: Record<string, unknown[]>) => any;
 
 /**
@@ -121,7 +121,7 @@ export class GroupBy<S extends Schema, K extends keyof S> {
       // b) Calculate and Push Aggregated Values
       for (const [colName, op] of aggOps) {
         const series = this._df.col(colName as keyof S);
-        
+
         // This mapping of indices to values is O(group_size).
         // It creates a minimal temporary array `values`.
         // To strictly "never create object", we might want to avoid this array,

@@ -45,7 +45,7 @@ describe('GroupBy Edge Cases', () => {
       // { A: 4, B: 2 }
       // All are unique (count 1 each)
       expect(counts.shape[0]).toBe(4);
-      
+
       const rows = counts.toArray();
       expect(rows[0]?.count).toBe(1);
     });
@@ -110,7 +110,7 @@ describe('GroupBy Edge Cases', () => {
       const df = DataFrame.from({ A: m.int32(), B: m.int32() }, sameData);
       const groups = df.groupby('A').count();
       expect(groups.shape[0]).toBe(1);
-      
+
       const rows = groups.toArray();
       expect(rows[0]?.count).toBe(2);
     });
