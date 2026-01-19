@@ -28,6 +28,23 @@ export interface CsvOptions {
 
   /** Datetime parsing options (column-specific, optional) */
   datetime?: DateTimeOptions;
+
+  /**
+   * Per-task memory limit in bytes (optional).
+   *
+   * When set, readCsv will check file size before loading and return
+   * a memoryError in the result if the estimated memory usage exceeds this limit.
+   *
+   * If not set, falls back to global config (see configure()).
+   *
+   * @example
+   * ```ts
+   * const { df, memoryError } = await readCsv('./large.csv', {
+   *   memoryLimitBytes: 100 * 1024 * 1024, // 100MB limit
+   * });
+   * ```
+   */
+  memoryLimitBytes?: number;
 }
 
 export type DateTimeFormat = 'iso' | 'sql' | 'date' | 'unix-ms' | 'unix-s';

@@ -1,35 +1,23 @@
 /**
  * Row Index - Efficiently stores byte offsets for each row in a CSV file.
- *
- * Uses Uint32Array segments to handle files larger than 4GB.
- * Each segment can index up to ~4 billion byte positions.
  */
 
 import { IndexOutOfBoundsError } from '../../errors';
 
 const SEGMENT_SIZE = 1_000_000;
 const LF = 10;
-const CR = 13;
 
 /**
  * Builds and stores row byte offsets for lazy row access.
- * Enables O(1) lookup of any row's position in the file.
  */
 export class RowIndex {
-  /** Total number of data rows (excluding header if present) */
   readonly rowCount: number;
-
-  /** Byte offset segments - each segment holds up to SEGMENT_SIZE offsets */
-  private readonly _segments: Uint32Array[];
-
-  /** File size in bytes */
+  private readonly _segments: Float64Array[];
   private readonly _fileSize: number;
-
-  /** Offset to first data row (after header) */
   private readonly _dataStartOffset: number;
 
   private constructor(
-    segments: Uint32Array[],
+    segments: Float64Array[],
     rowCount: number,
     fileSize: number,
     dataStartOffset: number,
@@ -40,96 +28,120 @@ export class RowIndex {
     this._dataStartOffset = dataStartOffset;
   }
 
-  /**
-   * Build row index by scanning file for newlines.
-   * Uses Buffer.indexOf for SIMD-accelerated newline finding.
-   *
-   * @param buffer - File content as Buffer
-   * @param hasHeader - Whether first row is header
-   * @returns RowIndex instance
-   */
-  static build(buffer: Buffer, hasHeader: boolean): RowIndex {
-    const len = buffer.length;
-    const offsets: number[] = [];
+  static async build(file: ReturnType<typeof Bun.file>, hasHeader: boolean): Promise<RowIndex> {
+    const fileSize = file.size;
+    const CHUNK_SIZE = 32 * 1024 * 1024; // 32MB chunks
 
-    // Find all line start positions
-    let pos = 0;
-    offsets.push(0); // First line starts at 0
+    const segments: Float64Array[] = [];
+    let currentSegment = new Float64Array(SEGMENT_SIZE);
+    let countInSegment = 0;
+    let totalRowCount = 0;
 
-    while (pos < len) {
-      const idx = buffer.indexOf(LF, pos);
-      if (idx === -1) break;
-      offsets.push(idx + 1);
-      pos = idx + 1;
+    const pushOffset = (offset: number) => {
+      if (countInSegment === SEGMENT_SIZE) {
+        segments.push(currentSegment);
+        currentSegment = new Float64Array(SEGMENT_SIZE);
+        countInSegment = 0;
+      }
+      currentSegment[countInSegment++] = offset;
+      totalRowCount++;
+    };
+
+    pushOffset(0);
+
+    let currentOffset = 0;
+    while (currentOffset < fileSize) {
+      const readSize = Math.min(CHUNK_SIZE, fileSize - currentOffset);
+      const buffer = Buffer.from(
+        await file.slice(currentOffset, currentOffset + readSize).arrayBuffer(),
+      );
+
+      let posInChunk = 0;
+      while (true) {
+        const idx = buffer.indexOf(LF, posInChunk);
+        if (idx === -1) break;
+
+        const globalIdx = currentOffset + idx + 1;
+        if (globalIdx < fileSize) {
+          pushOffset(globalIdx);
+        }
+        posInChunk = idx + 1;
+      }
+      currentOffset += readSize;
     }
 
-    // Determine data start (skip header if present)
-    const dataStartIndex = hasHeader ? 1 : 0;
-    const dataStartOffset = offsets[dataStartIndex] ?? 0;
+    if (countInSegment > 0) {
+      segments.push(currentSegment.slice(0, countInSegment));
+    }
 
-    // Count actual data rows (excluding trailing empty lines)
-    let dataRowCount = offsets.length - dataStartIndex;
+    const dataStartIndex = hasHeader ? 1 : 0;
+    const dataStartOffset = segments[0] ? (segments[0]![dataStartIndex] ?? fileSize) : fileSize;
+
+    let dataRowCount = Math.max(0, totalRowCount - dataStartIndex);
+
+    // Skip trailing empty lines
     while (dataRowCount > 0) {
-      const rowStart = offsets[dataStartIndex + dataRowCount - 1]!;
-      const nextStart = offsets[dataStartIndex + dataRowCount] ?? len;
-      // Check if line is empty or just whitespace
-      if (nextStart - rowStart > 1) break;
+      const idx = dataStartIndex + dataRowCount - 1;
+      const segIdx = Math.floor(idx / SEGMENT_SIZE);
+      const offIdx = idx % SEGMENT_SIZE;
+      const rowStart = segments[segIdx]![offIdx]!;
+
+      if (rowStart < fileSize) break;
       dataRowCount--;
     }
 
-    // Build segments from data row offsets only
-    const segments: Uint32Array[] = [];
-    const dataOffsets = offsets.slice(dataStartIndex, dataStartIndex + dataRowCount + 1);
+    const finalSegments: Float64Array[] = [];
+    let currentFinal = new Float64Array(SEGMENT_SIZE);
+    let finalCount = 0;
 
-    for (let i = 0; i < dataOffsets.length; i += SEGMENT_SIZE) {
-      const segmentData = dataOffsets.slice(i, i + SEGMENT_SIZE);
-      segments.push(new Uint32Array(segmentData));
+    for (let i = 0; i < dataRowCount; i++) {
+      const globalIdx = dataStartIndex + i;
+      const segIdx = Math.floor(globalIdx / SEGMENT_SIZE);
+      const offIdx = globalIdx % SEGMENT_SIZE;
+
+      if (finalCount === SEGMENT_SIZE) {
+        finalSegments.push(currentFinal);
+        currentFinal = new Float64Array(SEGMENT_SIZE);
+        finalCount = 0;
+      }
+      currentFinal[finalCount++] = segments[segIdx]![offIdx]!;
     }
 
-    return new RowIndex(segments, dataRowCount, len, dataStartOffset);
+    const endGlobalIdx = dataStartIndex + dataRowCount;
+    const endSegIdx = Math.floor(endGlobalIdx / SEGMENT_SIZE);
+    const endOffIdx = endGlobalIdx % SEGMENT_SIZE;
+    const finalOffset = segments[endSegIdx]?.[endOffIdx] ?? fileSize;
+
+    if (finalCount === SEGMENT_SIZE) {
+      finalSegments.push(currentFinal);
+      currentFinal = new Float64Array(SEGMENT_SIZE);
+      finalCount = 0;
+    }
+    currentFinal[finalCount++] = finalOffset;
+
+    if (finalCount > 0) {
+      finalSegments.push(currentFinal.slice(0, finalCount));
+    }
+
+    return new RowIndex(finalSegments, dataRowCount, fileSize, dataStartOffset);
   }
 
-  /**
-   * Get byte offset for a specific row.
-   * @param rowIndex - Zero-based row index (relative to data, not header)
-   * @returns Byte offset in file
-   */
   getRowOffset(rowIndex: number): number {
     if (rowIndex < 0 || rowIndex >= this.rowCount) {
       throw new IndexOutOfBoundsError(rowIndex, 0, this.rowCount - 1);
     }
-
-    const segmentIdx = Math.floor(rowIndex / SEGMENT_SIZE);
-    const offsetInSegment = rowIndex % SEGMENT_SIZE;
-    return this._segments[segmentIdx]![offsetInSegment]!;
+    const segIdx = Math.floor(rowIndex / SEGMENT_SIZE);
+    return this._segments[segIdx]![rowIndex % SEGMENT_SIZE]!;
   }
 
-  /**
-   * Get byte range for a row (start to next row start).
-   * @param rowIndex - Zero-based row index
-   * @returns [startByte, endByte] tuple
-   */
-  getRowRange(rowIndex: number): [number, number] {
-    const start = this.getRowOffset(rowIndex);
-    const end = rowIndex + 1 < this.rowCount ? this.getRowOffset(rowIndex + 1) : this._fileSize;
-    return [start, end];
-  }
-
-  /**
-   * Get byte range for multiple consecutive rows.
-   * @param startRow - Starting row index
-   * @param endRow - Ending row index (exclusive)
-   * @returns [startByte, endByte] tuple
-   */
   getRowsRange(startRow: number, endRow: number): [number, number] {
     const start = this.getRowOffset(startRow);
-    const end = endRow < this.rowCount ? this.getRowOffset(endRow) : this._fileSize;
+    const segIdx = Math.floor(endRow / SEGMENT_SIZE);
+    const offIdx = endRow % SEGMENT_SIZE;
+    const end = this._segments[segIdx]?.[offIdx] ?? this._fileSize;
     return [start, end];
   }
 
-  /**
-   * Estimate memory usage of this index in bytes.
-   */
   memoryUsage(): number {
     return this._segments.reduce((sum, seg) => sum + seg.byteLength, 0);
   }

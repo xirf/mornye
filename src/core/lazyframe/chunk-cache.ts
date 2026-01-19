@@ -3,14 +3,27 @@
  *
  * Caches parsed row chunks with configurable memory budget.
  * Automatically evicts least-recently-used chunks when budget exceeded.
+ *
+ * Integrates with global memory tracker for server-side safety.
  */
 
-/** Parsed row data for a chunk */
-export interface ChunkData<T = unknown> {
+import { MemoryLimitError } from '../../errors';
+import {
+  generateTaskId,
+  getConfig,
+  releaseAllocation,
+  requestAllocation,
+  updateUsage,
+} from '../config';
+
+/** Parsed data for a chunk (Columnar) */
+export interface ChunkData {
   /** Starting row index of this chunk */
   startRow: number;
-  /** Parsed row objects */
-  rows: T[];
+  /** Parsed columns (arrays of values) */
+  columns: Record<string, unknown[]>;
+  /** Number of rows in this chunk */
+  rowCount: number;
   /** Approximate memory size in bytes */
   sizeBytes: number;
 }
@@ -29,26 +42,42 @@ const DEFAULT_CONFIG: CacheConfig = {
 };
 
 /**
- * LRU cache for parsed row chunks.
- * Provides O(1) access and automatic eviction.
+ * LRU cache for parsed chunks (Columnar Storage).
  */
-export class ChunkCache<T = unknown> {
+export class ChunkCache {
   private readonly _config: CacheConfig;
-
-  /** Map of chunkIndex -> ChunkData */
-  private readonly _cache: Map<number, ChunkData<T>>;
-
-  /** LRU order - most recent at end */
+  private readonly _cache: Map<number, ChunkData>;
   private readonly _lruOrder: number[];
-
-  /** Current memory usage in bytes */
   private _memoryUsed: number;
+  private readonly _taskId: string;
+  private _isRegistered: boolean;
 
   constructor(config: Partial<CacheConfig> = {}) {
     this._config = { ...DEFAULT_CONFIG, ...config };
     this._cache = new Map();
     this._lruOrder = [];
     this._memoryUsed = 0;
+    this._taskId = generateTaskId();
+    this._isRegistered = false;
+
+    // Register with global memory tracker
+    this._registerWithTracker();
+  }
+
+  /**
+   * Register this cache's memory budget with the global tracker.
+   */
+  private _registerWithTracker(): void {
+    const globalConfig = getConfig();
+    if (!globalConfig.enabled) return;
+
+    const allocation = requestAllocation(this._taskId, this._config.maxMemoryBytes);
+    this._isRegistered = allocation.success;
+
+    // If allocation partially succeeded, adjust our local limit
+    if (allocation.success && allocation.allocatedBytes < this._config.maxMemoryBytes) {
+      this._config.maxMemoryBytes = allocation.allocatedBytes;
+    }
   }
 
   /**
@@ -100,7 +129,7 @@ export class ChunkCache<T = unknown> {
    * Get a cached chunk, marking it as recently used.
    * Returns undefined if not cached.
    */
-  get(chunkIndex: number): ChunkData<T> | undefined {
+  get(chunkIndex: number): ChunkData | undefined {
     const chunk = this._cache.get(chunkIndex);
     if (chunk) {
       this._markUsed(chunkIndex);
@@ -111,7 +140,7 @@ export class ChunkCache<T = unknown> {
   /**
    * Store a chunk in cache, evicting old chunks if needed.
    */
-  set(chunkIndex: number, chunk: ChunkData<T>): void {
+  set(chunkIndex: number, chunk: ChunkData): void {
     // If already exists, remove old size from memory count
     const existing = this._cache.get(chunkIndex);
     if (existing) {
@@ -130,6 +159,11 @@ export class ChunkCache<T = unknown> {
     this._cache.set(chunkIndex, chunk);
     this._memoryUsed += chunk.sizeBytes;
     this._markUsed(chunkIndex);
+
+    // Report usage to global tracker
+    if (this._isRegistered) {
+      updateUsage(this._taskId, this._memoryUsed);
+    }
   }
 
   /**
@@ -139,31 +173,36 @@ export class ChunkCache<T = unknown> {
     this._cache.clear();
     this._lruOrder.length = 0;
     this._memoryUsed = 0;
+
+    // Update global tracker
+    if (this._isRegistered) {
+      updateUsage(this._taskId, 0);
+    }
   }
 
   /**
-   * Get rows from cache if available.
-   * @param startRow - Starting row index
-   * @param count - Number of rows to retrieve
-   * @returns Array of [rowIndex, rowData] or undefined entries for uncached rows
+   * Destroy this cache and release global memory allocation.
+   *
+   * Call this when the cache is no longer needed to free up
+   * memory budget for other operations.
    */
-  getRows(startRow: number, count: number): (T | undefined)[] {
-    const results: (T | undefined)[] = new Array(count);
+  destroy(): void {
+    this.clear();
 
-    for (let i = 0; i < count; i++) {
-      const rowIndex = startRow + i;
-      const chunkIndex = this.getChunkIndex(rowIndex);
-      const chunk = this.get(chunkIndex);
-
-      if (chunk) {
-        const offsetInChunk = rowIndex - chunk.startRow;
-        results[i] = chunk.rows[offsetInChunk];
-      } else {
-        results[i] = undefined;
-      }
+    // Release allocation from global tracker
+    if (this._isRegistered) {
+      releaseAllocation(this._taskId);
+      this._isRegistered = false;
     }
+  }
 
-    return results;
+  /**
+   * Get columns data for a range of rows.
+   * Note: This might be inefficient if crossing many chunks.
+   * Ideally iterate via chunks directly.
+   */
+  getColumns(startRow: number, count: number, columnNames: string[]): Record<string, unknown[]> {
+    throw new Error('Use getChunk and iterate chunks directly for performance.');
   }
 
   /**
@@ -192,32 +231,42 @@ export class ChunkCache<T = unknown> {
   }
 
   /**
-   * Estimate memory size of a row array.
-   * Rough estimate: ~100 bytes per field for strings, 8 bytes for numbers.
+   * Estimate memory size of columnar data.
    */
-  static estimateSize<R>(rows: R[], fieldCount: number): number {
-    if (rows.length === 0) return 0;
+  static estimateSize(columns: Record<string, unknown[]>, rowCount: number): number {
+    if (rowCount === 0) return 0;
+    let totalSize = 0;
 
-    // Sample first row to estimate
-    const sample = rows[0];
-    let rowSize = 0;
-
-    if (sample && typeof sample === 'object') {
-      for (const value of Object.values(sample)) {
-        if (typeof value === 'string') {
-          rowSize += 50 + value.length * 2; // String overhead + chars
-        } else if (typeof value === 'number') {
-          rowSize += 8; // Float64
-        } else if (typeof value === 'boolean') {
-          rowSize += 4;
-        } else {
-          rowSize += 20; // Default overhead
-        }
+    for (const values of Object.values(columns)) {
+      // Estimate based on first non-null value
+      const sample = values.find((v) => v !== null && v !== undefined);
+      if (typeof sample === 'string') {
+        totalSize += rowCount * 50; // Average string size estimate
+      } else {
+        totalSize += rowCount * 8; // Numbers/bools
       }
-    } else {
-      rowSize = fieldCount * 50; // Fallback estimate
     }
+    return totalSize;
+  }
 
-    return rows.length * rowSize;
+  /**
+   * Check if a proposed allocation would fit within the budget.
+   * Returns success result or error if denied.
+   */
+  checkAllocation(requestedBytes: number): { success: boolean; error?: MemoryLimitError } {
+    if (!this._isRegistered) return { success: true };
+
+    const result = requestAllocation(this._taskId, requestedBytes);
+    if (!result.success && result.error) {
+      return {
+        success: false,
+        error: new MemoryLimitError(
+          result.error.requestedBytes,
+          result.error.availableBytes,
+          result.error.globalLimitBytes,
+        ),
+      };
+    }
+    return { success: true };
   }
 }

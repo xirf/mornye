@@ -1,6 +1,17 @@
+import type { MemoryLimitError } from '../../errors';
 import type { DataFrame } from '../dataframe';
 import type { Series } from '../series';
-import type { DTypeKind, InferSchema, Schema } from '../types';
+import type { InferSchema, Schema } from '../types';
+
+/**
+ * Result of a LazyFrame operation that might hit memory limits.
+ */
+export interface LazyFrameResult<S extends Schema, T = DataFrame<S>> {
+  /** The resulting data if operation succeeded (fully or partially) */
+  data?: T;
+  /** Memory limit error if operation was throttled or aborted */
+  memoryError?: MemoryLimitError;
+}
 
 /**
  * Read-only view interface for LazyFrame.
@@ -21,6 +32,19 @@ export interface LazyFrameConfig {
 
   /** Number of rows per cache chunk (default: 10,000) */
   chunkSize?: number;
+
+  /**
+   * If true, keeps string columns as Uint8Array (bytes) instead of decoding.
+   * Useful for extreme memory optimization when specific string comparisons can be done on bytes.
+   */
+  raw?: boolean;
+
+  /**
+   * If true, forces garbage collection after processing each chunk.
+   * Only works in runtimes that expose a GC API (e.g. Bun with --expose-gc, or Bun default in some versions).
+   * @default false
+   */
+  forceGc?: boolean;
 }
 
 /**
@@ -39,14 +63,20 @@ export interface ILazyFrame<S extends Schema> extends LazyFrameView<S> {
   /** Select specific columns */
   select<K extends keyof S>(...cols: K[]): ILazyFrame<Pick<S, K>>;
 
+  /**
+   * Count rows matching a predicate (streaming - very low memory).
+   * If no predicate provided, returns total row count.
+   */
+  count(predicate?: (row: InferSchema<S>, index: number) => boolean): Promise<number>;
+
   /** Filter rows by predicate (streaming - low memory) */
-  filter(fn: (row: InferSchema<S>, index: number) => boolean): Promise<DataFrame<S>>;
+  filter(fn: (row: InferSchema<S>, index: number) => boolean): Promise<LazyFrameResult<S>>;
 
   /** Collect all data into a regular DataFrame (loads everything into memory) */
-  collect(): Promise<DataFrame<S>>;
+  collect(): Promise<LazyFrameResult<S>>;
 
   /** Collect with row limit */
-  collect(limit: number): Promise<DataFrame<S>>;
+  collect(limit: number): Promise<LazyFrameResult<S>>;
 
   /** Get column names */
   columns(): (keyof S)[];
@@ -60,6 +90,12 @@ export interface ILazyFrame<S extends Schema> extends LazyFrameView<S> {
   /** Clear cached data */
   clearCache(): void;
 
+  /** Release all memory and trackings associated with this LazyFrame */
+  destroy(): void;
+
   /** File path */
   readonly path: string;
+
+  /** Async iterator for streaming chunks (DataFrame) */
+  [Symbol.asyncIterator](): AsyncIterator<DataFrame<S>>;
 }

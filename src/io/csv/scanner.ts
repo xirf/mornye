@@ -4,11 +4,20 @@ import { inferColumnType } from './inference';
 import { type CsvOptions, resolveOptions } from './options';
 
 /**
+ * Maximum bytes to read for schema inference.
+ * 1MB should be enough for header + 1000+ sample rows in most cases.
+ */
+const SCHEMA_SAMPLE_BYTES = 1024 * 1024; // 1MB
+
+/**
  * Scan a CSV file for lazy loading.
  *
  * Unlike readCsv which loads everything into memory, scanCsv creates
  * a LazyFrame that loads data on-demand. Ideal for large files that
  * exceed available RAM.
+ *
+ * Only the first ~1MB of the file is read for schema inference,
+ * making this safe to use on files of any size.
  *
  * @param path - Path to CSV file
  * @param options - CSV parsing options
@@ -38,9 +47,14 @@ export async function scanCsv<S extends Schema = Schema>(
   const providedSchema = options?.schema;
   const lazyConfig = options?.lazyConfig ?? {};
 
-  // Read file for initial scanning
   const file = Bun.file(path);
-  const arrayBuffer = await file.arrayBuffer();
+  const fileSize = file.size;
+
+  // Read only the first 1MB (or less for small files) for schema inference
+  // This makes scanCsv safe for files of any size
+  const sampleSize = Math.min(SCHEMA_SAMPLE_BYTES, fileSize);
+  const sampleBlob = file.slice(0, sampleSize);
+  const arrayBuffer = await sampleBlob.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
   const bytes = new Uint8Array(arrayBuffer);
   const len = buffer.length;
@@ -69,12 +83,12 @@ export async function scanCsv<S extends Schema = Schema>(
   } else {
     // Sample first N rows for inference
     const samples: string[][] = [];
-    const sampleSize = Math.min(opts.sampleRows, 1000);
+    const maxSampleRows = Math.min(opts.sampleRows, 1000);
 
     let pos = opts.hasHeader ? firstLineEnd + 1 : 0;
     let sampledCount = 0;
 
-    while (pos < len && sampledCount < sampleSize) {
+    while (pos < len && sampledCount < maxSampleRows) {
       const lineEnd = buffer.indexOf(LF, pos);
       const end = lineEnd === -1 ? len : lineEnd;
       let lineEndClean = end;
@@ -92,7 +106,7 @@ export async function scanCsv<S extends Schema = Schema>(
     schema = inferSchemaFromSamples(headers, samples);
   }
 
-  // Create LazyFrame
+  // Create LazyFrame - it will handle row counting separately
   return LazyFrame._create(
     path,
     schema as S,

@@ -92,40 +92,40 @@ describe('LazyFrame', () => {
   describe('filter', () => {
     test('filter() returns matching rows as DataFrame', async () => {
       const lazy = await scanCsv(LAZY_CSV_PATH);
-      const filtered = await lazy.filter((row) => (row as { id: number }).id <= 10);
+      const result = await lazy.filter((row) => (row as { id: number }).id <= 10);
 
-      expect(filtered.shape[0]).toBe(10);
-      expect(filtered.col('id').at(0)).toBe(1);
-      expect(filtered.col('id').at(9)).toBe(10);
+      expect(result.data!.shape[0]).toBe(10);
+      expect(result.data!.col('id').at(0)).toBe(1);
+      expect(result.data!.col('id').at(9)).toBe(10);
     });
 
     test('filter() with complex condition', async () => {
       const lazy = await scanCsv(LAZY_CSV_PATH);
-      const filtered = await lazy.filter((row) => {
+      const result = await lazy.filter((row) => {
         const r = row as { price: number; quantity: number };
         return r.price > 100 && r.quantity > 500;
       });
 
       // price > 100 means id > 66.67, quantity > 500 means id > 50
       // Both conditions: id > 67
-      expect(filtered.shape[0]).toBeGreaterThan(0);
+      expect(result.data!.shape[0]).toBeGreaterThan(0);
     });
   });
 
   describe('collect', () => {
     test('collect() returns full DataFrame', async () => {
       const lazy = await scanCsv(LAZY_CSV_PATH);
-      const df = await lazy.collect();
+      const result = await lazy.collect();
 
-      expect(df.shape[0]).toBe(1000);
-      expect(df.shape[1]).toBe(5);
+      expect(result.data!.shape[0]).toBe(1000);
+      expect(result.data!.shape[1]).toBe(5);
     });
 
     test('collect(limit) returns limited DataFrame', async () => {
       const lazy = await scanCsv(LAZY_CSV_PATH);
-      const df = await lazy.collect(100);
+      const result = await lazy.collect(100);
 
-      expect(df.shape[0]).toBe(100);
+      expect(result.data!.shape[0]).toBe(100);
     });
   });
 

@@ -1,25 +1,17 @@
 import { DataFrame } from '../dataframe';
 import type { Series } from '../series';
-import type { DType, DTypeKind, InferSchema, Schema } from '../types';
+import type { DTypeKind, InferSchema, Schema } from '../types';
 import { ChunkCache, type ChunkData } from './chunk-cache';
-import type { ILazyFrame, LazyFrameConfig } from './interface';
+import type { ILazyFrame, LazyFrameConfig, LazyFrameResult } from './interface';
+import { parseChunk, parseChunkBytes } from './parser';
 import { RowIndex } from './row-index';
+import { LazyFrameColumnView } from './view';
 
 /**
  * LazyFrame - Memory-efficient DataFrame for large CSV files.
  *
  * Keeps data on disk and loads rows on-demand using a chunked LRU cache.
  * Suitable for files that exceed available RAM.
- *
- * @example
- * ```ts
- * const lazy = await scanCsv('./huge_file.csv');
- * const first10 = await lazy.head(10);
- * first10.print();
- *
- * // Stream filter without loading all data
- * const filtered = await lazy.filter(row => row.price > 100);
- * ```
  */
 export class LazyFrame<S extends Schema> implements ILazyFrame<S> {
   readonly schema: S;
@@ -27,12 +19,12 @@ export class LazyFrame<S extends Schema> implements ILazyFrame<S> {
   readonly path: string;
 
   private readonly _file: ReturnType<typeof Bun.file>;
-  private readonly _buffer: Buffer;
   private readonly _rowIndex: RowIndex;
   private readonly _columnOrder: (keyof S)[];
-  private readonly _cache: ChunkCache<InferSchema<S>>;
+  private readonly _cache: ChunkCache;
   private readonly _hasHeader: boolean;
   private readonly _delimiter: string;
+  private readonly _config: LazyFrameConfig;
 
   /**
    * Private constructor - use scanCsv() factory function instead.
@@ -40,7 +32,6 @@ export class LazyFrame<S extends Schema> implements ILazyFrame<S> {
   private constructor(
     path: string,
     file: ReturnType<typeof Bun.file>,
-    buffer: Buffer,
     schema: S,
     columnOrder: (keyof S)[],
     rowIndex: RowIndex,
@@ -50,12 +41,12 @@ export class LazyFrame<S extends Schema> implements ILazyFrame<S> {
   ) {
     this.path = path;
     this._file = file;
-    this._buffer = buffer;
     this.schema = schema;
     this._columnOrder = columnOrder;
     this._rowIndex = rowIndex;
     this.shape = [rowIndex.rowCount, columnOrder.length] as const;
-    this._cache = new ChunkCache<InferSchema<S>>({
+    this._config = config;
+    this._cache = new ChunkCache({
       maxMemoryBytes: config.maxCacheMemory ?? 100 * 1024 * 1024,
       chunkSize: config.chunkSize ?? 10_000,
     });
@@ -75,15 +66,11 @@ export class LazyFrame<S extends Schema> implements ILazyFrame<S> {
     delimiter = ',',
   ): Promise<LazyFrame<S>> {
     const file = Bun.file(path);
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    const rowIndex = RowIndex.build(buffer, hasHeader);
+    const rowIndex = await RowIndex.build(file, hasHeader);
 
     return new LazyFrame<S>(
       path,
       file,
-      buffer,
       schema,
       columnOrder,
       rowIndex,
@@ -100,8 +87,9 @@ export class LazyFrame<S extends Schema> implements ILazyFrame<S> {
    * Get a column as Series (loads all data for that column).
    */
   async col<K extends keyof S>(name: K): Promise<Series<S[K]['kind']>> {
-    const df = await this.collect();
-    return df.col(name);
+    const result = await this.collect();
+    if (result.memoryError) throw result.memoryError;
+    return result.data!.col(name);
   }
 
   /**
@@ -119,8 +107,8 @@ export class LazyFrame<S extends Schema> implements ILazyFrame<S> {
    */
   async head(n = 5): Promise<DataFrame<S>> {
     const count = Math.min(n, this.shape[0]);
-    const rows = await this._loadRows(0, count);
-    return DataFrame.from(this.schema, rows);
+    const cols = await this._loadColumns(0, count);
+    return this._toDataFrame(cols, count);
   }
 
   /**
@@ -129,8 +117,8 @@ export class LazyFrame<S extends Schema> implements ILazyFrame<S> {
   async tail(n = 5): Promise<DataFrame<S>> {
     const count = Math.min(n, this.shape[0]);
     const startRow = this.shape[0] - count;
-    const rows = await this._loadRows(startRow, count);
-    return DataFrame.from(this.schema, rows);
+    const cols = await this._loadColumns(startRow, count);
+    return this._toDataFrame(cols, count);
   }
 
   /**
@@ -141,46 +129,101 @@ export class LazyFrame<S extends Schema> implements ILazyFrame<S> {
     for (const colName of cols) {
       newSchema[colName] = this.schema[colName];
     }
-
-    // Return a view that filters columns on read
     return new LazyFrameColumnView<S, K>(this, cols, newSchema);
   }
 
   /**
-   * Filter rows by predicate function (streaming - memory efficient).
-   * Processes rows in chunks to limit memory usage.
+   * Count rows matching a predicate.
    */
-  async filter(fn: (row: InferSchema<S>, index: number) => boolean): Promise<DataFrame<S>> {
+  async count(predicate?: (row: InferSchema<S>, index: number) => boolean): Promise<number> {
+    if (!predicate) return this.shape[0];
+
+    let matchCount = 0;
+    const chunkSize = this._cache.chunkSize;
+
+    for (let startRow = 0; startRow < this.shape[0]; startRow += chunkSize) {
+      const count = Math.min(chunkSize, this.shape[0] - startRow);
+      const cols = await this._loadColumns(startRow, count);
+      const colNames = Object.keys(cols);
+
+      for (let i = 0; i < count; i++) {
+        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        const row = {} as any;
+        for (const name of colNames) {
+          row[name] = cols[name]?.[i];
+        }
+
+        if (predicate(row, startRow + i)) {
+          matchCount++;
+        }
+      }
+
+      this.clearCache();
+      if (this._config.forceGc && typeof Bun !== 'undefined' && Bun.gc) {
+        // @ts-ignore
+        Bun.gc(true);
+      }
+    }
+
+    return matchCount;
+  }
+
+  /**
+   * Filter rows by predicate function.
+   */
+  async filter(fn: (row: InferSchema<S>, index: number) => boolean): Promise<LazyFrameResult<S>> {
     const matchingRows: InferSchema<S>[] = [];
     const chunkSize = this._cache.chunkSize;
 
     for (let startRow = 0; startRow < this.shape[0]; startRow += chunkSize) {
       const count = Math.min(chunkSize, this.shape[0] - startRow);
-      const chunk = await this._loadRows(startRow, count);
+      const cols = await this._loadColumns(startRow, count);
+      const colNames = Object.keys(cols);
 
-      for (let i = 0; i < chunk.length; i++) {
-        const globalIdx = startRow + i;
-        if (fn(chunk[i]!, globalIdx)) {
-          matchingRows.push(chunk[i]!);
+      for (let i = 0; i < count; i++) {
+        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        const row = {} as any;
+        for (const name of colNames) {
+          row[name] = cols[name]?.[i];
+        }
+
+        if (fn(row, startRow + i)) {
+          matchingRows.push(row);
+        }
+      }
+
+      if (startRow % (chunkSize * 10) === 0) {
+        this.clearCache();
+        if (this._config.forceGc && typeof Bun !== 'undefined' && Bun.gc) {
+          // @ts-ignore
+          Bun.gc(true);
         }
       }
     }
 
-    return DataFrame.from(this.schema, matchingRows);
+    const df = DataFrame.from(this.schema, matchingRows);
+    this.clearCache();
+    return { data: df };
   }
 
   /**
-   * Collect all (or limited) rows into a DataFrame.
-   * Warning: For large files, this loads everything into memory.
+   * Collect all rows.
    */
-  async collect(limit?: number): Promise<DataFrame<S>> {
+  async collect(limit?: number): Promise<LazyFrameResult<S>> {
     const count = limit !== undefined ? Math.min(limit, this.shape[0]) : this.shape[0];
-    const rows = await this._loadRows(0, count);
-    return DataFrame.from(this.schema, rows);
-  }
+    const cols = await this._loadColumns(0, count);
 
-  // Info & Display
-  // ===============================================================
+    const estimatedSize = ChunkCache.estimateSize(cols, count);
+    const allocation = this._cache.checkAllocation(estimatedSize);
+
+    const df = this._toDataFrame(cols, count);
+    this.clearCache();
+
+    return {
+      data: df,
+      memoryError: allocation.success ? undefined : allocation.error,
+    };
+  }
 
   /**
    * Get info about the LazyFrame.
@@ -212,21 +255,27 @@ export class LazyFrame<S extends Schema> implements ILazyFrame<S> {
     }
   }
 
-  /**
-   * Clear the row cache to free memory.
-   */
   clearCache(): void {
     this._cache.clear();
   }
 
-  // Internal: Row Loading
+  destroy(): void {
+    this._cache.destroy();
+  }
+
+  // Internal: Column Loading
   // ===============================================================
 
   /**
-   * Load rows from file (with caching).
+   * Load columns from file (with caching).
    */
-  private async _loadRows(startRow: number, count: number): Promise<InferSchema<S>[]> {
-    const results: InferSchema<S>[] = new Array(count);
+  private async _loadColumns(startRow: number, count: number): Promise<Record<string, unknown[]>> {
+    const colNames = this._columnOrder as string[];
+    const results: Record<string, unknown[]> = {};
+    for (const name of colNames) {
+      results[name] = new Array(count);
+    }
+
     const chunkSize = this._cache.chunkSize;
     const startChunk = this._cache.getChunkIndex(startRow);
     const endChunk = this._cache.getChunkIndex(startRow + count - 1);
@@ -235,21 +284,27 @@ export class LazyFrame<S extends Schema> implements ILazyFrame<S> {
       let chunk = this._cache.get(chunkIdx);
 
       if (!chunk) {
-        // Load and cache this chunk
         chunk = await this._loadChunk(chunkIdx);
         this._cache.set(chunkIdx, chunk);
       }
 
-      // Copy relevant rows to results
       const chunkStartRow = chunkIdx * chunkSize;
-      const resultStartIdx = Math.max(0, chunkStartRow - startRow);
-      const chunkOffsetStart = Math.max(0, startRow - chunkStartRow);
-      const chunkOffsetEnd = Math.min(chunk.rows.length, startRow + count - chunkStartRow);
+      const globalStart = Math.max(startRow, chunkStartRow);
+      const globalEnd = Math.min(startRow + count, chunkStartRow + chunk.rowCount);
+      const length = globalEnd - globalStart;
 
-      for (let i = chunkOffsetStart; i < chunkOffsetEnd; i++) {
-        const resultIdx = chunkStartRow + i - startRow;
-        if (resultIdx >= 0 && resultIdx < count) {
-          results[resultIdx] = chunk.rows[i]!;
+      if (length <= 0) continue;
+
+      const srcStart = globalStart - chunkStartRow;
+      const destStart = globalStart - startRow;
+
+      for (const colName of colNames) {
+        const srcArray = chunk.columns[colName];
+        const destArray = results[colName];
+        if (srcArray && destArray) {
+          for (let i = 0; i < length; i++) {
+            destArray[destStart + i] = srcArray[srcStart + i];
+          }
         }
       }
     }
@@ -258,217 +313,93 @@ export class LazyFrame<S extends Schema> implements ILazyFrame<S> {
   }
 
   /**
+   * Async Iterator - Yields chunks of DataFrames (Zero Copy!)
+   */
+  async *[Symbol.asyncIterator](): AsyncIterator<DataFrame<S>> {
+    const chunkSize = this._cache.chunkSize;
+
+    for (let startRow = 0; startRow < this.shape[0]; startRow += chunkSize) {
+      const chunkIdx = this._cache.getChunkIndex(startRow);
+      let chunk = this._cache.get(chunkIdx);
+
+      if (!chunk) {
+        chunk = await this._loadChunk(chunkIdx);
+        this._cache.set(chunkIdx, chunk);
+      }
+
+      // Create DataFrame using existing schema (Zero Copy logic applied in loadChunk/toDataFrame construction effectively)
+      const df = this._toDataFrame(chunk.columns, chunk.rowCount);
+
+      yield df;
+
+      this.clearCache();
+
+      if (this._config.forceGc && typeof Bun !== 'undefined' && Bun.gc) {
+        // @ts-ignore
+        Bun.gc(true);
+      }
+    }
+  }
+
+  /**
    * Load a specific chunk from file.
    */
-  private async _loadChunk(chunkIndex: number): Promise<ChunkData<InferSchema<S>>> {
+  private async _loadChunk(chunkIndex: number): Promise<ChunkData> {
     const chunkSize = this._cache.chunkSize;
     const startRow = chunkIndex * chunkSize;
     const endRow = Math.min(startRow + chunkSize, this.shape[0]);
     const count = endRow - startRow;
 
     if (count <= 0) {
-      return { startRow, rows: [], sizeBytes: 0 };
+      return { startRow, columns: {}, rowCount: 0, sizeBytes: 0 };
     }
 
     const [startByte, endByte] = this._rowIndex.getRowsRange(startRow, endRow);
-    const chunkBytes = this._buffer.subarray(startByte, endByte);
-    const chunkText = chunkBytes.toString('utf-8');
+    const blob = this._file.slice(startByte, endByte);
 
-    const rows = this._parseChunk(chunkText, count);
-    const sizeBytes = ChunkCache.estimateSize(rows, this._columnOrder.length);
+    let columns: Record<string, unknown[]>;
 
-    return { startRow, rows, sizeBytes };
+    if (this._config.raw) {
+      const arrayBuffer = await blob.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      columns = parseChunkBytes(
+        bytes,
+        count,
+        this._columnOrder as string[],
+        this.schema,
+        this._delimiter.charCodeAt(0),
+      );
+    } else {
+      const chunkText = await blob.text();
+      columns = parseChunk(
+        chunkText,
+        count,
+        this._columnOrder as string[],
+        this.schema,
+        this._delimiter,
+      );
+    }
+
+    const sizeBytes = ChunkCache.estimateSize(columns, count);
+
+    return { startRow, columns, rowCount: count, sizeBytes };
   }
 
   /**
-   * Parse a chunk of CSV text into row objects.
+   * Convert raw column data to typed DataFrame using this.schema.
    */
-  private _parseChunk(text: string, expectedRows: number): InferSchema<S>[] {
-    const rows: InferSchema<S>[] = [];
-    const lines = text.split('\n');
+  private _toDataFrame(data: Record<string, unknown[]>, rowCount: number): DataFrame<S> {
+    const columns = new Map<keyof S, Series<DTypeKind>>();
 
-    for (let i = 0; i < lines.length && rows.length < expectedRows; i++) {
-      let line = lines[i]!;
-      // Trim CR if present
-      if (line.endsWith('\r')) {
-        line = line.slice(0, -1);
+    for (const colName of this._columnOrder) {
+      const values = data[colName as string];
+      if (!values) {
+        throw new Error(`Missing column data for '${String(colName)}'`);
       }
-      if (line.length === 0) continue;
-
-      const fields = this._parseLine(line);
-      const row = {} as InferSchema<S>;
-
-      for (let col = 0; col < this._columnOrder.length; col++) {
-        const colName = this._columnOrder[col]! as keyof InferSchema<S>;
-        const dtype = this.schema[colName as keyof S];
-        const fieldValue = fields[col] ?? '';
-
-        (row as Record<string, unknown>)[colName as string] = this._parseValue(fieldValue, dtype);
-      }
-
-      rows.push(row);
+      const dtype = this.schema[colName]!;
+      columns.set(colName, DataFrame._createSeries(dtype, values));
     }
 
-    return rows;
-  }
-
-  /**
-   * Parse a single CSV line handling quotes.
-   */
-  private _parseLine(line: string): string[] {
-    const fields: string[] = [];
-    let current = '';
-    let inQuotes = false;
-    let i = 0;
-
-    while (i < line.length) {
-      const char = line[i]!;
-
-      if (inQuotes) {
-        if (char === '"') {
-          if (i + 1 < line.length && line[i + 1] === '"') {
-            current += '"';
-            i += 2;
-          } else {
-            inQuotes = false;
-            i++;
-          }
-        } else {
-          current += char;
-          i++;
-        }
-      } else {
-        if (char === '"') {
-          inQuotes = true;
-          i++;
-        } else if (char === this._delimiter) {
-          fields.push(current);
-          current = '';
-          i++;
-        } else {
-          current += char;
-          i++;
-        }
-      }
-    }
-
-    fields.push(current);
-    return fields;
-  }
-
-  /**
-   * Parse a string value according to dtype.
-   */
-  private _parseValue(value: string, dtype: DType<DTypeKind> | undefined): unknown {
-    if (!dtype) return value;
-
-    switch (dtype.kind) {
-      case 'float64':
-        return Number.parseFloat(value) || 0;
-      case 'int32':
-        return Number.parseInt(value, 10) || 0;
-      case 'bool':
-        return value === 'true' || value === 'True' || value === '1';
-      default:
-        return value;
-    }
-  }
-}
-
-/**
- * Column view wrapper for select() operation.
- * Wraps a LazyFrame and filters columns on access.
- */
-class LazyFrameColumnView<S extends Schema, K extends keyof S> implements ILazyFrame<Pick<S, K>> {
-  readonly schema: Pick<S, K>;
-  readonly shape: readonly [rows: number, cols: number];
-  readonly path: string;
-
-  private readonly _source: LazyFrame<S>;
-  private readonly _columns: K[];
-
-  constructor(source: LazyFrame<S>, columns: K[], schema: Pick<S, K>) {
-    this._source = source;
-    this._columns = columns;
-    this.schema = schema;
-    this.shape = [source.shape[0], columns.length] as const;
-    this.path = source.path;
-  }
-
-  async col<C extends K>(name: C): Promise<Series<Pick<S, K>[C]['kind']>> {
-    return this._source.col(name) as Promise<Series<Pick<S, K>[C]['kind']>>;
-  }
-
-  columns(): K[] {
-    return [...this._columns];
-  }
-
-  async head(n = 5): Promise<DataFrame<Pick<S, K>>> {
-    const df = await this._source.head(n);
-    return df.select(...this._columns);
-  }
-
-  async tail(n = 5): Promise<DataFrame<Pick<S, K>>> {
-    const df = await this._source.tail(n);
-    return df.select(...this._columns);
-  }
-
-  select<C extends K>(...cols: C[]): ILazyFrame<Pick<Pick<S, K>, C>> {
-    const newSchema = {} as Pick<Pick<S, K>, C>;
-    for (const colName of cols) {
-      newSchema[colName] = this.schema[colName];
-    }
-    return new LazyFrameColumnView<S, C>(
-      this._source,
-      cols,
-      newSchema as Pick<S, C>,
-    ) as unknown as ILazyFrame<Pick<Pick<S, K>, C>>;
-  }
-
-  async filter(
-    fn: (row: InferSchema<Pick<S, K>>, index: number) => boolean,
-  ): Promise<DataFrame<Pick<S, K>>> {
-    const df = await this._source.filter((row, idx) => {
-      const projected = {} as InferSchema<Pick<S, K>>;
-      for (const col of this._columns) {
-        (projected as Record<string, unknown>)[col as string] = (row as Record<string, unknown>)[
-          col as string
-        ];
-      }
-      return fn(projected, idx);
-    });
-    return df.select(...this._columns);
-  }
-
-  async collect(limit?: number): Promise<DataFrame<Pick<S, K>>> {
-    const df = await this._source.collect(limit);
-    return df.select(...this._columns);
-  }
-
-  info(): { rows: number; columns: number; dtypes: Record<string, string>; cached: number } {
-    const baseInfo = this._source.info();
-    const dtypes: Record<string, string> = {};
-    for (const col of this._columns) {
-      dtypes[col as string] = baseInfo.dtypes[col as string] ?? 'unknown';
-    }
-    return {
-      rows: baseInfo.rows,
-      columns: this._columns.length,
-      dtypes,
-      cached: baseInfo.cached,
-    };
-  }
-
-  async print(): Promise<void> {
-    const df = await this.head(10);
-    console.log(`LazyFrame [${this.path}] (${this._columns.length} columns selected)`);
-    df.print();
-    if (this.shape[0] > 10) {
-      console.log(`... ${this.shape[0] - 10} more rows`);
-    }
-  }
-
-  clearCache(): void {
-    this._source.clearCache();
+    return DataFrame._fromColumns(this.schema, columns, this._columnOrder, rowCount);
   }
 }

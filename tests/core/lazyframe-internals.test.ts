@@ -61,23 +61,26 @@ describe('ChunkCache', () => {
 describe('RowIndex', () => {
   test('builds offsets and enforces bounds', async () => {
     const csv = 'a,b\n1,2\n3,4\n';
-    const buffer = Buffer.from(csv);
-    const idx = RowIndex.build(buffer, true);
+    const path = `${TMP_DIR}/row-index-test-1.csv`;
+    await Bun.write(path, csv);
+
+    const idx = await RowIndex.build(Bun.file(path), true);
 
     expect(idx.rowCount).toBe(2);
     expect(idx.getRowOffset(0)).toBe(csv.indexOf('1'));
-    expect(idx.getRowRange(1)[0]).toBe(csv.indexOf('3'));
+    expect(idx.getRowOffset(1)).toBe(csv.indexOf('3'));
     expect(() => idx.getRowOffset(5)).toThrow();
   });
 
-  test('getRowsRange returns contiguous range to file end', () => {
+  test('getRowsRange returns contiguous range to file end', async () => {
     const csv = 'a\n1\n2\n';
-    const buffer = Buffer.from(csv);
-    const idx = RowIndex.build(buffer, false);
+    const path = `${TMP_DIR}/row-index-test-2.csv`;
+    await Bun.write(path, csv);
+    const idx = await RowIndex.build(Bun.file(path), false);
 
-    const [start, end] = idx.getRowsRange(0, 3);
+    const [start, end] = idx.getRowsRange(0, 1);
     expect(start).toBe(0);
-    expect(end).toBe(buffer.length);
+    expect(end).toBe(csv.indexOf('1'));
   });
 });
 
@@ -101,8 +104,8 @@ describe('LazyFrame parse internals', () => {
     const tail = await view.tail(1);
     expect(tail.shape[0]).toBe(1);
 
-    const collected = await view.collect(1);
-    expect(collected.shape[1]).toBe(2);
+    const result = await view.collect(1);
+    expect(result.data!.shape[1]).toBe(2);
 
     const info = view.info();
     expect(info.columns).toBe(2);

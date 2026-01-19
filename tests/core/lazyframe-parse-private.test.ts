@@ -23,8 +23,10 @@ describe('LazyFrame private parsing helpers', () => {
   });
 
   test('RowIndex memory usage reflects segments', async () => {
-    const buf = Buffer.from('a\n1\n');
-    const idx = RowIndex.build(buf, false);
+    const csv = 'a\n1\n';
+    const path = `${PATH}.tmp`;
+    await Bun.write(path, csv);
+    const idx = await RowIndex.build(Bun.file(path), false);
     expect(idx.memoryUsage()).toBeGreaterThan(0);
   });
 });

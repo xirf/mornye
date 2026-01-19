@@ -1,5 +1,6 @@
 import type { DataFrame } from '../../core/dataframe';
 import type { Schema } from '../../core/types';
+import type { MemoryLimitError } from '../../errors';
 
 /**
  * Tracks parse failures for a single column.
@@ -25,6 +26,13 @@ export interface CsvReadResult<S extends Schema> {
   parseErrors?: Map<keyof S, ParseFailures>;
   /** Whether any parse errors occurred */
   hasErrors: boolean;
+  /**
+   * Memory limit error if memory budget was exceeded.
+   *
+   * When this is set, df may be empty or partial.
+   * This error is returned, not thrown, following the "never throw" pattern.
+   */
+  memoryError?: MemoryLimitError;
 }
 
 /**

@@ -10,3 +10,4 @@ export { InvalidOperationError } from './invalid-operation';
 export { FileError } from './file-error';
 export { ParseError } from './parse-error';
 export { SchemaError } from './schema-error';
+export { MemoryLimitError } from './memory-limit-error';
