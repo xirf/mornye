@@ -98,4 +98,19 @@ export interface ILazyFrame<S extends Schema> extends LazyFrameView<S> {
 
   /** Async iterator for streaming chunks (DataFrame) */
   [Symbol.asyncIterator](): AsyncIterator<DataFrame<S>>;
+
+  /**
+   * Group by keys and aggregate (Binary-Optimized).
+   * @param keys Column names to group by
+   * @param aggs Aggregations to perform
+   */
+  groupby(keys: string[], aggs: AggDef[]): Promise<LazyFrameResult<S>>;
+}
+
+export type AggFunc = 'sum' | 'count' | 'mean' | 'min' | 'max';
+
+export interface AggDef {
+  col: string;
+  func: AggFunc;
+  outName: string;
 }

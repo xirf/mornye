@@ -1,4 +1,5 @@
 import type { DType, DTypeKind, Schema } from '../types';
+import type { Vector } from './chunk-cache';
 
 // ASCII Character Codes
 const CODE_NEWLINE = 10;
@@ -124,7 +125,7 @@ export function parseValue(value: string, dtype: DType<DTypeKind> | undefined): 
 
 /**
  * Parse a chunk of CSV bytes into columns (Byte-level optimization).
- * Returns Uint8Array for strings, number for numeric types.
+ * Returns Vector array (Struct of Arrays layout).
  */
 export function parseChunkBytes(
   bytes: Uint8Array,
@@ -132,13 +133,48 @@ export function parseChunkBytes(
   columnOrder: string[],
   schema: Schema,
   delimiterCode: number,
-): Record<string, unknown[]> {
+): Vector[] {
   const colOrderLen = columnOrder.length;
-  const columns: Record<string, unknown[]> = {};
 
-  // Pre-allocate arrays
-  for (const col of columnOrder) {
-    columns[col] = new Array(expectedRows);
+  // Initialize Vectors
+  const columns: Vector[] = new Array(colOrderLen);
+
+  for (let i = 0; i < colOrderLen; i++) {
+    const colName = columnOrder[i]!;
+    const dtype = schema[colName];
+
+    if (!dtype) {
+      // Unknown type ? Default to string-like behavior (offsets)
+      columns[i] = {
+        kind: 'string',
+        data: bytes,
+        offsets: new Uint32Array(expectedRows),
+        lengths: new Uint32Array(expectedRows),
+        needsUnescape: new Uint8Array(expectedRows),
+      };
+      continue;
+    }
+
+    switch (dtype.kind) {
+      case 'float64':
+        columns[i] = { kind: 'float64', data: new Float64Array(expectedRows) };
+        break;
+      case 'int32':
+        columns[i] = { kind: 'int32', data: new Int32Array(expectedRows) };
+        break;
+      case 'bool':
+        columns[i] = { kind: 'bool', data: new Uint8Array(expectedRows) };
+        break;
+      default:
+        // String or unknown
+        columns[i] = {
+          kind: 'string',
+          data: bytes,
+          offsets: new Uint32Array(expectedRows),
+          lengths: new Uint32Array(expectedRows),
+          needsUnescape: new Uint8Array(expectedRows),
+        };
+    }
   }
 
   let pos = 0;
@@ -167,6 +203,7 @@ export function parseChunkBytes(
       let fieldEnd = currentPos;
 
       // Check for quotes
+      let hasEscapedQuote = 0;
       if (bytes[currentPos] === CODE_QUOTE) {
         fieldStart++; // skip opening quote
         currentPos++;
@@ -176,6 +213,7 @@ export function parseChunkBytes(
             if (currentPos + 1 < lineEndClean && bytes[currentPos + 1] === CODE_QUOTE) {
               // Escaped quote "" -> skip both
               currentPos += 2;
+              hasEscapedQuote = 1;
             } else {
               // End of quoted field
               fieldEnd = currentPos;
@@ -201,53 +239,38 @@ export function parseChunkBytes(
         }
       }
 
-      // 3. Parse Value
-      const colName = columnOrder[colIndex]!;
-      const dtype = schema[colName];
+      // 3. Store Value
+      const vec = columns[colIndex]!;
 
-      // Determine value based on dtype
-      if (!dtype) {
-        // Default to subarray (string view)
-        columns[colName]![rowIndex] = bytes.subarray(fieldStart, fieldEnd);
-      } else {
-        switch (dtype.kind) {
-          case 'float64':
-            columns[colName]![rowIndex] = batof(bytes, fieldStart, fieldEnd);
-            break;
-          case 'int32':
-            columns[colName]![rowIndex] = batoi(bytes, fieldStart, fieldEnd);
-            break;
-          case 'bool': {
-            // Check first char: t/T/1
-            const first = bytes[fieldStart];
-            columns[colName]![rowIndex] = first === 116 || first === 84 || first === 49; // 't', 'T', '1'
-            break;
-          }
-          default:
-            // string / unknown -> keep as bytes
-            columns[colName]![rowIndex] = bytes.subarray(fieldStart, fieldEnd);
+      switch (vec.kind) {
+        case 'float64':
+          vec.data[rowIndex] = batof(bytes, fieldStart, fieldEnd);
+          break;
+        case 'int32':
+          vec.data[rowIndex] = batoi(bytes, fieldStart, fieldEnd);
+          break;
+        case 'bool': {
+          const first = bytes[fieldStart];
+          vec.data[rowIndex] = first === 116 || first === 84 || first === 49 ? 1 : 0;
+          break;
         }
+        case 'string':
+          vec.offsets[rowIndex] = fieldStart;
+          vec.lengths[rowIndex] = fieldEnd - fieldStart;
+          if (hasEscapedQuote) vec.needsUnescape[rowIndex] = 1;
+          break;
       }
 
       colIndex++;
     }
 
-    // Fill remaining columns with null/empty if line is short
+    // Fill remaining columns with defaults
     while (colIndex < colOrderLen) {
-      const colName = columnOrder[colIndex]!;
-      columns[colName]![rowIndex] = null; // or empty?
       colIndex++;
     }
 
     rowIndex++;
     pos = lineEnd + 1;
-  }
-
-  // Trim if needed
-  if (rowIndex < expectedRows) {
-    for (const col of columnOrder) {
-      columns[col] = columns[col]!.slice(0, rowIndex);
-    }
   }
 
   return columns;

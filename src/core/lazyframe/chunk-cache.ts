@@ -17,16 +17,28 @@ import {
 } from '../config';
 
 /** Parsed data for a chunk (Columnar) */
-export interface ChunkData {
+export interface BinaryChunk {
   /** Starting row index of this chunk */
   startRow: number;
   /** Parsed columns (arrays of values) */
-  columns: Record<string, unknown[]>;
+  columns: Vector[];
   /** Number of rows in this chunk */
   rowCount: number;
   /** Approximate memory size in bytes */
   sizeBytes: number;
 }
+
+export type Vector =
+  | { kind: 'float64'; data: Float64Array }
+  | { kind: 'int32'; data: Int32Array }
+  | { kind: 'bool'; data: Uint8Array } // 0 or 1
+  | {
+      kind: 'string';
+      data: Uint8Array;
+      offsets: Uint32Array;
+      lengths: Uint32Array;
+      needsUnescape: Uint8Array;
+    };
 
 /** Cache configuration */
 export interface CacheConfig {
@@ -46,7 +58,7 @@ const DEFAULT_CONFIG: CacheConfig = {
  */
 export class ChunkCache {
   private readonly _config: CacheConfig;
-  private readonly _cache: Map<number, ChunkData>;
+  private readonly _cache: Map<number, BinaryChunk>;
   private readonly _lruOrder: number[];
   private _memoryUsed: number;
   private readonly _taskId: string;
@@ -129,7 +141,7 @@ export class ChunkCache {
    * Get a cached chunk, marking it as recently used.
    * Returns undefined if not cached.
    */
-  get(chunkIndex: number): ChunkData | undefined {
+  get(chunkIndex: number): BinaryChunk | undefined {
     const chunk = this._cache.get(chunkIndex);
     if (chunk) {
       this._markUsed(chunkIndex);
@@ -140,7 +152,7 @@ export class ChunkCache {
   /**
    * Store a chunk in cache, evicting old chunks if needed.
    */
-  set(chunkIndex: number, chunk: ChunkData): void {
+  set(chunkIndex: number, chunk: BinaryChunk): void {
     // If already exists, remove old size from memory count
     const existing = this._cache.get(chunkIndex);
     if (existing) {
@@ -233,17 +245,14 @@ export class ChunkCache {
   /**
    * Estimate memory size of columnar data.
    */
-  static estimateSize(columns: Record<string, unknown[]>, rowCount: number): number {
+  static estimateSize(columns: Vector[], rowCount: number): number {
     if (rowCount === 0) return 0;
     let totalSize = 0;
 
-    for (const values of Object.values(columns)) {
-      // Estimate based on first non-null value
-      const sample = values.find((v) => v !== null && v !== undefined);
-      if (typeof sample === 'string') {
-        totalSize += rowCount * 50; // Average string size estimate
-      } else {
-        totalSize += rowCount * 8; // Numbers/bools
+    for (const vector of columns) {
+      totalSize += vector.data.byteLength;
+      if (vector.kind === 'string') {
+        totalSize += vector.offsets.byteLength;
       }
     }
     return totalSize;

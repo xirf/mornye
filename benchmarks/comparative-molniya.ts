@@ -3,7 +3,7 @@ import { configure, getMemoryStats, scanCsv } from '../src';
 
 // SETTINGS
 const DATA_PATH = './artifac/2019-Nov.csv';
-const MEMORY_LIMIT = 100 * 1024 * 1024; // 100MB
+const MEMORY_LIMIT = 200 * 1024 * 1024; // 200MB
 
 configure({ globalLimitBytes: MEMORY_LIMIT });
 
@@ -21,7 +21,7 @@ async function run() {
   const lazy = await scanCsv(DATA_PATH, {
     lazyConfig: {
       chunkSize: 50_000,
-      maxCacheMemory: 50 * 1024 * 1024,
+      maxCacheMemory: 200 * 1024 * 1024,
       raw: true, // Enable byte-level parsing
       forceGc: true,
     },

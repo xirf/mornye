@@ -1,9 +1,10 @@
 import { DataFrame } from '../dataframe';
 import type { Series } from '../series';
 import type { DTypeKind, InferSchema, Schema } from '../types';
-import { ChunkCache, type ChunkData } from './chunk-cache';
-import type { ILazyFrame, LazyFrameConfig, LazyFrameResult } from './interface';
-import { parseChunk, parseChunkBytes } from './parser';
+import { type BinaryChunk, ChunkCache, type Vector } from './chunk-cache';
+import { BinaryGroupBy } from './groupby-binary';
+import type { AggDef, ILazyFrame, LazyFrameConfig, LazyFrameResult } from './interface';
+import { batof, batoi, parseChunkBytes } from './parser';
 import { RowIndex } from './row-index';
 import { LazyFrameColumnView } from './view';
 
@@ -142,15 +143,38 @@ export class LazyFrame<S extends Schema> implements ILazyFrame<S> {
     const chunkSize = this._cache.chunkSize;
 
     for (let startRow = 0; startRow < this.shape[0]; startRow += chunkSize) {
+      // Use getChunk loop logic to avoid materializing columns
+      const chunkIdx = this._cache.getChunkIndex(startRow);
+      let chunk = this._cache.get(chunkIdx);
+
+      if (!chunk) {
+        chunk = await this._loadChunk(chunkIdx);
+        this._cache.set(chunkIdx, chunk);
+      }
+
+      const chunkStartRow = chunkIdx * chunkSize;
+      const localStart = Math.max(0, startRow - chunkStartRow);
       const count = Math.min(chunkSize, this.shape[0] - startRow);
-      const cols = await this._loadColumns(startRow, count);
-      const colNames = Object.keys(cols);
+
+      // Resolve vectors for columns we need access to?
+      // predicate might need all columns.
+      // We pass a proxy "row" object to the predicate?
+      // Or we just decode values on demand.
 
       for (let i = 0; i < count; i++) {
+        const rowIndex = localStart + i;
+
+        // Create a lazy row proxy or simple object?
+        // For performance, maybe simple object if predicate is complex.
+        // But zero-copy means we read directly.
+        // Let's manually construct 'row' object from vectors.
+
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
         const row = {} as any;
-        for (const name of colNames) {
-          row[name] = cols[name]?.[i];
+        for (let c = 0; c < this._columnOrder.length; c++) {
+          const colName = this._columnOrder[c] as string;
+          const vector = chunk.columns[c]!;
+          row[colName] = this._readVectorValue(vector, rowIndex);
         }
 
         if (predicate(row, startRow + i)) {
@@ -176,15 +200,26 @@ export class LazyFrame<S extends Schema> implements ILazyFrame<S> {
     const chunkSize = this._cache.chunkSize;
 
     for (let startRow = 0; startRow < this.shape[0]; startRow += chunkSize) {
+      const chunkIdx = this._cache.getChunkIndex(startRow);
+      let chunk = this._cache.get(chunkIdx);
+
+      if (!chunk) {
+        chunk = await this._loadChunk(chunkIdx);
+        this._cache.set(chunkIdx, chunk);
+      }
+
+      const chunkStartRow = chunkIdx * chunkSize;
+      const localStart = Math.max(0, startRow - chunkStartRow);
       const count = Math.min(chunkSize, this.shape[0] - startRow);
-      const cols = await this._loadColumns(startRow, count);
-      const colNames = Object.keys(cols);
 
       for (let i = 0; i < count; i++) {
+        const rowIndex = localStart + i;
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
         const row = {} as any;
-        for (const name of colNames) {
-          row[name] = cols[name]?.[i];
+        for (let c = 0; c < this._columnOrder.length; c++) {
+          const colName = this._columnOrder[c] as string;
+          const vector = chunk.columns[c]!;
+          row[colName] = this._readVectorValue(vector, rowIndex);
         }
 
         if (fn(row, startRow + i)) {
@@ -213,7 +248,18 @@ export class LazyFrame<S extends Schema> implements ILazyFrame<S> {
     const count = limit !== undefined ? Math.min(limit, this.shape[0]) : this.shape[0];
     const cols = await this._loadColumns(0, count);
 
-    const estimatedSize = ChunkCache.estimateSize(cols, count);
+    // Estimate size of materialized columns
+    let estimatedSize = 0;
+    for (const values of Object.values(cols)) {
+      if (values.length > 0) {
+        const sample = values[0];
+        if (typeof sample === 'string') {
+          estimatedSize += count * 50;
+        } else {
+          estimatedSize += count * 8;
+        }
+      }
+    }
     const allocation = this._cache.checkAllocation(estimatedSize);
 
     const df = this._toDataFrame(cols, count);
@@ -298,13 +344,22 @@ export class LazyFrame<S extends Schema> implements ILazyFrame<S> {
       const srcStart = globalStart - chunkStartRow;
       const destStart = globalStart - startRow;
 
-      for (const colName of colNames) {
-        const srcArray = chunk.columns[colName];
-        const destArray = results[colName];
-        if (srcArray && destArray) {
-          for (let i = 0; i < length; i++) {
-            destArray[destStart + i] = srcArray[srcStart + i];
-          }
+      for (let c = 0; c < colNames.length; c++) {
+        const colName = colNames[c]!;
+        const vector = chunk.columns[c]!;
+        const destArray = results[colName]!;
+
+        // Fill destination array
+        // We iterate and decode value-by-value for now.
+        // Optimization: Use typed array `.set` for numerics if destArray is typed.
+        // But results[colName] is initialized as Array(count) in generic case?
+        // Let's check init: "results[name] = new Array(count);"
+        // Ideally we should pre-allocate typed arrays if schema says so.
+        // But for compatibility with existing code that expects Record<string, unknown[]>,
+        // we can just fill it.
+
+        for (let i = 0; i < length; i++) {
+          destArray[destStart + i] = this._readVectorValue(vector, srcStart + i);
         }
       }
     }
@@ -328,7 +383,29 @@ export class LazyFrame<S extends Schema> implements ILazyFrame<S> {
       }
 
       // Create DataFrame using existing schema (Zero Copy logic applied in loadChunk/toDataFrame construction effectively)
-      const df = this._toDataFrame(chunk.columns, chunk.rowCount);
+      // Create DataFrame using existing schema (Zero Copy logic applied in loadChunk/toDataFrame construction effectively)
+      // Note: _toDataFrame expects Record, but we can update it or map chunk.columns (Vector[]) to Record.
+      // But _toDataFrame was designed to take Record.
+      // We should update _toDataFrame to take Vector[].
+      // For now, let's map it to Record of Vectors (or decoded?)
+      // Yield expects fully materialised DataFrame traditionally.
+      // If we yield a wrapper that stays lazy, that's better?
+      // But DataFrame is eager.
+      // So we must decode.
+
+      const dfData: Record<string, unknown[]> = {};
+      for (let i = 0; i < this._columnOrder.length; i++) {
+        const colName = this._columnOrder[i] as string;
+        const vector = chunk.columns[i]!;
+        // Decode entire vector to array
+        const arr = new Array(chunk.rowCount);
+        for (let r = 0; r < chunk.rowCount; r++) {
+          arr[r] = this._readVectorValue(vector, r);
+        }
+        dfData[colName] = arr;
+      }
+
+      const df = this._toDataFrame(dfData, chunk.rowCount);
 
       yield df;
 
@@ -342,47 +419,94 @@ export class LazyFrame<S extends Schema> implements ILazyFrame<S> {
   }
 
   /**
+   * Group by keys and aggregate (Binary-Optimized).
+   */
+  async groupby(keys: string[], aggs: AggDef[]): Promise<LazyFrameResult<S>> {
+    const groupBy = new BinaryGroupBy(keys, aggs, this.schema);
+
+    const chunkSize = this._cache.chunkSize;
+    for (let startRow = 0; startRow < this.shape[0]; startRow += chunkSize) {
+      const chunkIdx = this._cache.getChunkIndex(startRow);
+      // Check cache first
+      let chunk = this._cache.get(chunkIdx);
+
+      if (!chunk) {
+        chunk = await this._loadChunk(chunkIdx);
+        this._cache.set(chunkIdx, chunk);
+      }
+
+      groupBy.processChunk(chunk, this._columnOrder as string[]);
+
+      this.clearCache();
+
+      if (this._config.forceGc && typeof Bun !== 'undefined' && Bun.gc) {
+        // @ts-ignore
+        Bun.gc(true);
+      }
+    }
+
+    const df = groupBy.toDataFrame();
+    return { data: df as any };
+  }
+
+  /**
    * Load a specific chunk from file.
    */
-  private async _loadChunk(chunkIndex: number): Promise<ChunkData> {
+  /**
+   * Load a specific chunk from file.
+   */
+  private async _loadChunk(chunkIndex: number): Promise<BinaryChunk> {
     const chunkSize = this._cache.chunkSize;
     const startRow = chunkIndex * chunkSize;
     const endRow = Math.min(startRow + chunkSize, this.shape[0]);
     const count = endRow - startRow;
 
     if (count <= 0) {
-      return { startRow, columns: {}, rowCount: 0, sizeBytes: 0 };
+      return { startRow, columns: [], rowCount: 0, sizeBytes: 0 };
     }
 
     const [startByte, endByte] = this._rowIndex.getRowsRange(startRow, endRow);
     const blob = this._file.slice(startByte, endByte);
 
-    let columns: Record<string, unknown[]>;
-
-    if (this._config.raw) {
-      const arrayBuffer = await blob.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer);
-      columns = parseChunkBytes(
-        bytes,
-        count,
-        this._columnOrder as string[],
-        this.schema,
-        this._delimiter.charCodeAt(0),
-      );
-    } else {
-      const chunkText = await blob.text();
-      columns = parseChunk(
-        chunkText,
-        count,
-        this._columnOrder as string[],
-        this.schema,
-        this._delimiter,
-      );
-    }
+    const arrayBuffer = await blob.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    const columns = parseChunkBytes(
+      bytes,
+      count,
+      this._columnOrder as string[],
+      this.schema,
+      this._delimiter.charCodeAt(0),
+    );
 
     const sizeBytes = ChunkCache.estimateSize(columns, count);
 
     return { startRow, columns, rowCount: count, sizeBytes };
+  }
+
+  private _readVectorValue(vector: Vector, index: number): unknown {
+    switch (vector.kind) {
+      case 'float64':
+      case 'int32':
+        return vector.data[index];
+      case 'bool':
+        return vector.data[index] === 1;
+      case 'string': {
+        const start = vector.offsets[index]!;
+        const len = vector.lengths[index]!;
+        const buf = vector.data.subarray(start, start + len);
+
+        if (this._config.raw) {
+          return buf;
+        }
+
+        const str = new TextDecoder().decode(buf);
+        // handle quotes if needed
+        if (vector.needsUnescape[index]) {
+          return str.replace(/""/g, '"');
+        }
+        return str;
+      }
+    }
   }
 
   /**

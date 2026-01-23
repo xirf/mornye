@@ -1,7 +1,7 @@
 import type { DataFrame } from '../dataframe';
 import type { Series } from '../series';
 import type { InferSchema, Schema } from '../types';
-import type { ILazyFrame, LazyFrameResult } from './interface';
+import type { AggDef, ILazyFrame, LazyFrameResult } from './interface';
 
 /**
  * Column view wrapper for select() operation.
@@ -93,7 +93,8 @@ export class LazyFrameColumnView<S extends Schema, K extends keyof S>
   }
 
   async collect(limit?: number): Promise<LazyFrameResult<Pick<S, K>>> {
-    const result = await this._source.collect(limit);
+    const result =
+      limit !== undefined ? await this._source.collect(limit) : await this._source.collect();
     if (result.data) {
       return {
         data: result.data.select(...this._columns),
@@ -138,5 +139,9 @@ export class LazyFrameColumnView<S extends Schema, K extends keyof S>
 
   destroy(): void {
     this._source.destroy();
+  }
+
+  async groupby(keys: string[], aggs: AggDef[]): Promise<LazyFrameResult<Pick<S, K>>> {
+    return this._source.groupby(keys, aggs) as unknown as Promise<LazyFrameResult<Pick<S, K>>>;
   }
 }
