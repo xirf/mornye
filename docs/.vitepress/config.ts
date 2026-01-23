@@ -10,7 +10,18 @@ export default defineConfig({
   lastUpdated: true,
   ignoreDeadLinks: false,
   lang: 'en-US',
-  head: [['link', { rel: 'icon', href: '/logo.png' }]],
+  head: [
+    ['link', { rel: 'icon', href: '/logo.png' }],
+    ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
+    ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
+    [
+      'link',
+      {
+        rel: 'stylesheet',
+        href: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap',
+      },
+    ],
+  ],
   vite: {
     plugins: [
       UnoCSS(),
@@ -27,7 +38,9 @@ export default defineConfig({
   markdown: {
     codeTransformers: [
       transformerTwoslash({
-        typesCache: createFileSystemTypesCache(),
+        typesCache: createFileSystemTypesCache({
+          dir: './docs/.vitepress/cache/twoslash',
+        }),
         twoslashOptions: {
           compilerOptions: {
             paths: {

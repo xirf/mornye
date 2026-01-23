@@ -830,7 +830,9 @@ export class DataFrame<S extends Schema> implements IDataFrame<S> {
    * const encoded = df.toOrdinal('cat');
    * ```
    */
-  toOrdinal<K extends keyof S>(...columns: K[]): DataFrame<S> {
+  toOrdinal<K extends keyof S>(
+    ...columns: K[]
+  ): DataFrame<Omit<S, K> & { [P in K]: DType<'int32'> }> {
     return cols.toOrdinal(this, DataFrame._fromColumns, columns);
   }
 

@@ -460,7 +460,7 @@ export function toOrdinal<S extends Schema, K extends keyof S>(
     rowCount: number,
   ) => DataFrame<S>,
   columns: K[],
-): DataFrame<S> {
+): DataFrame<Omit<S, K> & { [P in K]: DType<'int32'> }> {
   const newColumns = new Map<keyof S, Series<DTypeKind>>();
   const newSchema = { ...ctx.schema };
 
@@ -475,7 +475,9 @@ export function toOrdinal<S extends Schema, K extends keyof S>(
     }
   }
 
-  return fromColumns(newSchema, newColumns, ctx._columnOrder, ctx.shape[0]);
+  return fromColumns(newSchema, newColumns, ctx._columnOrder, ctx.shape[0]) as unknown as DataFrame<
+    Omit<S, K> & { [P in K]: DType<'int32'> }
+  >;
 }
 
 /**

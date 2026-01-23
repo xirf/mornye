@@ -42,23 +42,7 @@ const copyInstall = () => {
 
 <template>
     <section class="py-24 px-6 relative overflow-hidden">
-        <!-- Background Glow -->
-        <div
-            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none">
-        </div>
-
         <div class="max-w-7xl mx-auto relative z-10">
-
-            <!-- Header -->
-            <div class="text-center mb-20">
-                <h2 class="text-3xl md:text-5xl font-bold dark:text-white mb-6 tracking-tight">Designed for Developers
-                </h2>
-                <p class="text-lg text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">
-                    A familiar API that feels like Pandas, powered by a high-performance engine designed for the
-                    TypeScript ecosystem.
-                </p>
-            </div>
-
             <div class="grid lg:grid-cols-2 gap-12 items-start opacity-90">
 
                 <!-- Left Column: IDE Showcase -->
@@ -82,7 +66,7 @@ const copyInstall = () => {
                         <button v-for="tab in tabs" :key="tab.id" @click="activeTab = tab.id as SampleKey"
                             class="px-4 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap"
                             :class="activeTab === tab.id
-                                ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-indigo-500/5'
+                                ? 'border-cat-yellow text-cat-yellow bg-cat-yellow/5'
                                 : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'">
                             {{ tab.label }}
                         </button>
@@ -104,93 +88,25 @@ const copyInstall = () => {
                 <!-- Right Column: Stats & Benchmarks -->
                 <div class="space-y-8">
 
-                    <!-- Benchmark Card -->
-                    <div class="glass-card p-8 rounded-2xl relative overflow-hidden">
-                        <div class="absolute top-0 right-0 p-4 opacity-10">
-                            <Zap class="w-24 h-24" />
+                    <!-- Header -->
+                    <div class="mb-20">
+                        <p class="text-lg text-slate-500 dark:text-slate-400">Our Principle</p>
+                        <h2 class="text-3xl md:text-5xl font-bold dark:text-white mb-6 tracking-tight leading-tight">
+                            <span class="text-cat-yellow italic">Performance</span> without
+                            <br />
+                            <span class="text-violet-400 italic">Surprises</span>
+                        </h2>
+                        <div class="flex flex-col gap-4">
+                            <p class="text-lg text-slate-500 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
+                                Molniya aims to process large datasets efficiently without sacrificing predictability.
+                                We're building toward a library where performance, memory efficiency, and type safety
+                                work together, not against each other.
+                            </p>
+                            <p class="text-lg text-slate-500 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
+                                We're working toward full type inference so TypeScript knows your data shape throughout
+                                your pipeline. Filter, group, and aggregate with confidence and autocomplete.
+                            </p>
                         </div>
-                        <h3 class="text-xl font-bold dark:text-white mb-6 flex items-center gap-2">
-                            <Zap class="w-5 h-5 text-amber-500" />
-                            Real-World Performance
-                        </h3>
-                        <p class="text-sm text-slate-500 mb-6">Loading 387MB (7.3M rows) Bitcoin CSV dataset.</p>
-
-                        <div class="space-y-4">
-                            <!-- Molniya -->
-                            <div>
-                                <div class="flex justify-between text-sm mb-1">
-                                    <span class="font-semibold text-indigo-500">Molniya (Bun)</span>
-                                    <span class="text-emerald-500 font-bold">1.28s</span>
-                                </div>
-                                <div class="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                    <div
-                                        class="h-full bg-emerald-500 w-[10%] rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Arquero -->
-                            <div>
-                                <div class="flex justify-between text-sm mb-1">
-                                    <span class="text-slate-500 dark:text-slate-400">Arquero (Node)</span>
-                                    <span class="text-slate-500">~9.11.4s</span>
-                                </div>
-                                <div class="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                    <div class="h-full bg-slate-400 w-[30%] rounded-full"></div>
-                                </div>
-                            </div>
-
-                            <!-- Danfo -->
-                            <div>
-                                <div class="flex justify-between text-sm mb-1">
-                                    <span class="text-slate-500 dark:text-slate-400">Danfo.js (Node)</span>
-                                    <span class="text-slate-500">~70.1s</span>
-                                </div>
-                                <div class="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                    <div class="h-full bg-slate-400 w-[95%] rounded-full"></div>
-                                </div>
-                            </div>
-                        </div>
-                        <p class="mt-6 text-[10px] text-slate-400 italic">
-                            * Benchmarks performed on M1 MacBook Air. Arquero and Danfo run on Node.js using their
-                            standard CSV utilities.
-                        </p>
-                    </div>
-
-                    <!-- Coverage Card -->
-                    <!-- <div class="glass-card p-8 rounded-2xl">
-                        <h3 class="text-xl font-bold dark:text-white mb-6 flex items-center gap-2">
-                            <Shield class="w-5 h-5 text-indigo-500" />
-                            Almost Production Ready
-                        </h3>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-xl">
-                                <div class="text-xs text-slate-500 mb-1">Tests</div>
-                                <div class="text-xl font-bold text-indigo-400">140+</div>
-                                <div class="text-[10px] text-slate-500">Fast regression checks</div>
-                            </div>
-                            <div class="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl">
-                                <div class="text-xs text-slate-500 mb-1">Coverage</div>
-                                <div class="text-xl font-bold text-emerald-400">95%</div>
-                                <div class="text-[10px] text-slate-500">Strict safety verified</div>
-                            </div>
-                        </div>
-                    </div> -->
-
-                    <!-- Quick Install -->
-                    <div
-                        class="glass-card p-6 rounded-2xl flex items-center justify-between gap-4 border-l-4 border-l-indigo-500">
-                        <div class="font-mono text-sm dark:text-slate-200">
-                            <span class="text-indigo-500 mr-2">$</span>bun add molniya
-                        </div>
-                        <button @click="copyInstall"
-                            class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-500 hover:text-indigo-500 relative group"
-                            title="Copy to clipboard">
-                            <span v-if="copied"
-                                class="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs py-1 px-2 rounded shadow-lg animate-fade-in-up">Copied!</span>
-                            <Check v-if="copied" class="w-5 h-5 text-emerald-500" />
-                            <Copy v-else class="w-5 h-5" />
-                        </button>
                     </div>
 
                 </div>
