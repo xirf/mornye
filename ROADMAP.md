@@ -1,8 +1,6 @@
 # Molniya Roadmap
 
-A prioritized list of features needed for pandas API parity.
-
-## ✅ Completed (v0.0.1)
+## Core Features
 
 - [x] Core `DataFrame` and `Series` structures
 - [x] Type system (`float64`, `int32`, `string`, `bool`)
@@ -20,58 +18,63 @@ A prioritized list of features needed for pandas API parity.
 | `dropna()`           | Drop rows with missing values   | ✅     |
 | `fillna()`           | Fill missing values             | ✅     |
 | `isna()` / `notna()` | Detect missing values           | ✅     |
-| `copy()`             | Deep copy DataFrame             | ✅     |
-| `sample()`           | Random row sampling             | ✅     |
-| `assign()`           | Add/modify columns              | ✅     |
-| `iloc()`             | Integer-location indexing       | ✅     |
-| `loc()`              | Label-based indexing            | ✅     |
+| `copy()`             | Deep copy DataFrame             | ❌     |
+| `sample()`           | Random row sampling             | ❌     |
+| `assign()`           | Add/modify columns              | ❌     |
+| `iloc()`             | Integer-location indexing       | ❌     |
+| `loc()`              | Label-based indexing            | ❌     |
+
+## LazyFrame & Query Optimization
 
 | Feature             | Description                                | Status |
 | ------------------- | ------------------------------------------ | ------ |
 | `scanCsv()`         | Lazy CSV loading (on-demand parsing)       | ✅     |
 | `LazyFrame`         | Memory-efficient DataFrame for big CSV     | ✅     |
-| Row Index           | O(1) random row access via byte offsets    | ✅     |
+| Row Index           | O(1) random row access via byte offsets    | ❌     |
 | LRU Chunk Cache     | Configurable memory budget (100MB default) | ✅     |
-| `head()` / `tail()` | Returns DataFrame without full load        | ✅     |
+| `head()` / `tail()` | Returns DataFrame without full load        | ❌     |
 | `filter()`          | Streaming filter with chunked processing   | ✅     |
 | `select()`          | Column projection on lazy data             | ✅     |
 | `collect()`         | Convert to full DataFrame when needed      | ✅     |
+| Column Pruning      | Skip reading unused columns                | ✅     |
+| Predicate Pushdown  | Filter during CSV parsing                  | ✅     |
 
-### Joining & Combining
+## Joining & Combining
 
-- [x] `merge()` - SQL-like joins (inner, left, right, outer)
-- [x] `concat()` - Concatenate DataFrames vertically/horizontally
-- [ ] `join()` - Join on index
-- [ ] `append()` - Append rows to DataFrame
+- [x] `merge()` - SQL-like joins (inner, left, right, outer) ✅
+- [x] `concat()` - Concatenate DataFrames vertically/horizontally ✅
+- [x] `join()` - Join on index ✅
+- [x] `append()` - Append rows to DataFrame ✅
 
-- [x] `dropDuplicates()` - Drop duplicate rows
-- [ ] `duplicate()` - Duplicate the dataframe
-- [x] `unique()` - Get unique rows
+- [x] `dropDuplicates()` - Drop duplicate rows ✅
+- [x] `duplicate()` - Duplicate the dataframe ✅
+- [x] `unique()` - Get unique rows ✅
 
-### I/O
+## I/O
 
-- [x] `toCsv()` - Write DataFrame to CSV
+- [ ] `toCsv()` - Write DataFrame to CSV
 - [ ] `toJson()` / `readJson()` - JSON support (toJson done)
 - [ ] `toParquet()` / `readParquet()` - Parquet support (optional)
 
-### Aggregation
+## Aggregation
 
-- [x] `median()`, `mode()`, `quantile()`
-- [x] `cumsum()`, `cummax()`, `cummin()`, `cumprod()`
+- [ ] `median()`, `mode()`, `quantile()`
+- [ ] `cumsum()`, `cummax()`, `cummin()`, `cumprod()`
 
-### String Operations (`Series.str`)
+## String Operations (`Series.str`)
 
-- [ ] `lower()`, `upper()`, `strip()`
-- [ ] `contains()`, `startswith()`, `endswith()`
-- [ ] `split()`, `replace()`, `len()`
+- [x] `lower()`, `upper()`, `strip()` ✅
+- [x] `contains()`, `startswith()`, `endswith()` ✅
+- [x] `replace()`, `len()` ✅
+- [ ] `split()` - Split strings into arrays
 
-### DateTime Operations (`Series.dt`)
+## DateTime Operations (`Series.dt`)
 
 - [ ] `year`, `month`, `day`, `hour`, `minute`, `second`
 - [ ] `dayofweek`, `dayofyear`
 - [ ] DateTime dtype support
 
-### Rolling/Window
+## Rolling/Window
 
 - [ ] `rolling()` with `mean`, `sum`, `min`, `max`
 - [ ] `shift()`, `diff()`
@@ -79,6 +82,6 @@ A prioritized list of features needed for pandas API parity.
 - [ ] `pivot_table()`, `melt()`, `stack()`, `unstack()`
 - [ ] `corr()`, `cov()` - Correlation/covariance
 - [ ] `rank()`, `pct_change()`
-- [ ] `astype()` - Type casting
+- [x] `astype()` - Type casting ✅
 - [ ] Multi-Index support
 - [ ] Lazy evaluation optimization
