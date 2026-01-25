@@ -12,18 +12,20 @@ sidebar: false
 
 ```ts twoslash
 // @noErrors
-// ---cut---
-import { scanCsv } from "molniya";
+import { LazyFrame, DType } from "molniya";
 
-const stream = await scanCsv("bitcoin_7m_rows.csv", {
-  batchSize: 50_000
-});
+const schema = {
+  timestamp: DType.DateTime,
+  price: DType.Float64,
+  volume: DType.Float64,
+};
 
-for await (const batch of stream) {
-  console.log(batch.shape);
-  batch.print();
-  break;
-}
+// Lazy evaluation with predicate pushdown
+const result = await LazyFrame.scanCsv("bitcoin.csv", schema)
+  .filter("price", ">", 50000)
+  .collect();
+
+console.log(result.data.toString());
 ```
 
 </template>
@@ -31,20 +33,19 @@ for await (const batch of stream) {
 <template #filtering>
 
 ```ts twoslash
-// @noErrors
-import { DataFrame } from "molniya";
-const df = DataFrame.fromColumns({
-  timestamp: [1],
-  price: [50000],
-  volume: [1.2],
-});
-// ---cut---
-// Expressive filtering
-const filtered = df
-  .where((col) => col("price").gt(50000))
-  .select("timestamp", "price", "volume");
+import { fromArrays, filter, select } from "molniya";
 
-filtered.print();
+const df = fromArrays({
+  item: ["GPU", "CPU", "RAM"],
+  price: [1200.0, 450.0, 150.0],
+  in_stock: [true, true, false],
+});
+
+// Clean functional API - throws on error
+const filtered = filter(df, "price", ">", 500);
+const result = select(filtered, ["item", "price"]);
+
+console.log(result.toString());
 ```
 
 </template>
@@ -52,20 +53,23 @@ filtered.print();
 <template #groupby>
 
 ```ts twoslash
-// @noErrors
-import { DataFrame } from "molniya";
-const df = DataFrame.fromColumns({
-  product: ["Laptop", "Mouse"],
-  category: ["Electronics", "Accessories"],
-  price: [999.99, 29.99],
-});
-// ---cut---
-// SQL-like aggregations
-const summary = df.groupby("category").agg({
-  price: "mean",
+import { fromArrays, groupby, unwrap } from "molniya";
+
+const df = fromArrays({
+  dept: ["Sales", "Sales", "Eng", "Eng", "HR"],
+  salary: [60000, 65000, 90000, 95000, 55000],
 });
 
-summary.print();
+// Group by department and calculate mean salary
+const result = unwrap(
+  groupby(
+    df,
+    ["dept"],
+    [{ col: "salary", func: "mean", outName: "avg_salary" }],
+  ),
+);
+
+console.log(result.toString());
 ```
 
 </template>
@@ -74,25 +78,24 @@ summary.print();
 
 ```ts twoslash
 // @errors: 2345
-import { DataFrame } from "molniya";
-// ---cut---
-const df = DataFrame.fromColumns({
-  price: [999.99, 29.99]
+import { fromArrays, getColumn } from "molniya";
+
+const df = fromArrays({
+  price: [999.99, 29.99],
 });
 
-// Error: Column 'non_existent' not found
-df.col("non_existent").mean();
+// Error: Column 'non_existent' not found (runtime check + type check!)
+const col = getColumn(df, "non_existent");
 
-// Success: Auto-complete working
-df.col("price").std();
+if (!col.ok) {
+  console.error(col.error);
+}
 ```
 
 </template>
 
 </Showcase>
 
-<LandingBenchmarks />
-
 <LandingPhilosophy />
 
-<Footer />
+<LandingFooter />
