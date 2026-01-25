@@ -5,26 +5,22 @@
 <h1 align="center">Molniya</h1>
 
 <p align="center">
-  <b>Strictly typed dataframes for TypeScript.</b><br>
-  Zero dependencies. SIMD accelerated. Optimized for Bun.
+  A simply typed DataFrame library with zero dependencies that honors your memory.
 </p>
 
 <p align="center">
   <a href="https://molniya.andka.id"><b>Documentation</b></a> • 
-  <a href="#benchmarks"><b>Benchmarks</b></a> • 
-  <a href="https://github.com/xirf/molniya/issues"><b>Issues</b></a>
+  <a href="https://molniya.andka.id/guide/cookbook"><b>Cookbook</b></a> • 
+  <a href="https://github.com/xirf/molniya/tree/main/examples"><b>Examples</b></a>
 </p>
 
-<br />
+---
 
-## Why Molniya?
+## What is Molniya?
 
-Most JavaScript data libraries treat types as an afterthought. **Molniya** puts them first.
+Molniya is a DataFrame library built specifically for Bun. It helps you load, transform, and analyze structured data without the complexity of heavy frameworks.
 
-- **🧠 True Type Inference:** It tracks your schema through filters, selects, and aggregations.
-- **⚡ Bun Native:** Built specifically to leverage Bun's high-performance I/O and runtime capabilities.
-- **🚀 SIMD Accelerated:** Uses low-level optimizations for line finding and parsing.
-- **📦 Zero Dependencies:** No bloat. No massive node_modules folder.
+Think Pandas for Python, but designed for TypeScript and Bun from the ground up.
 
 ## Install
 
@@ -34,50 +30,110 @@ bun add molniya
 
 ## Quick Start
 
-Experience the "IDE magic" where types follow your data.
+Simple and clean - operations throw errors when they fail:
 
 ```typescript
-import { DataFrame } from "molniya";
+import { fromArrays, filter, select } from "molniya";
 
-// 1. Create a DataFrame
-// Molniya automatically infers:
-// name: string, age: number, is_active: boolean
-const df = DataFrame.fromColumns({
-  name: ["Alice", "Bob", "Carol"],
-  age: [25, 30, 22],
-  is_active: [true, false, true],
+const df = fromArrays({
+  name: ["Alice", "Bob", "Charlie"],
+  age: [25, 30, 35],
+  city: ["NYC", "LA", "Chicago"],
 });
 
-// 2. Chain methods safely
-const result = df
-  .filter((row) => row.is_active) // Typescript knows 'row' shape here
-  .assign("score", (row) => row.age * 2) // Adds 'score' to the type definition
-  .select("name", "score"); // Removes 'age' and 'is_active'
+// Throws if error occurs - no Result unwrapping needed
+const adults = filter(df, "age", ">=", 30);
+const result = select(adults, ["name", "city"]);
 
-// 3. Result is fully typed
-// result: DataFrame<{ name: string; score: number }>
-result.print();
+console.log(result.toString());
 ```
 
-## Performance
+**Error handling**: Wrap in try/catch when you need to handle errors:
 
-Molniya is built for speed, utilizing SIMD instructions for parsing.
+```typescript
+try {
+  const df = fromArrays({ ... });
+  const filtered = filter(df, "age", ">=", 30);
+} catch (error) {
+  console.error("Operation failed:", error);
+}
+```
 
-| Task              | Molniya  | Native Array |
-| :---------------- | :------- | :----------- |
-| **Type Safety**   | ✅ Strict | ❌ Loose      |
-| **Memory Layout** | Columnar | Row-based    |
-| **Dependencies**  | 0        | 0            |
+**Type inference**: TypeScript infers schema types automatically:
 
-_(Detailed benchmarks against other libraries coming soon)_
+```typescript
+const df = fromArrays({
+  name: ["Alice"], // Type: DataFrame<{ name: "string", age: "float64" }>
+  age: [25],
+});
+```
 
-## Roadmap
+## Why Molniya?
 
-- [x] CSV Parsing (SIMD)
-- [x] Basic Filtering & Sorting
-- [ ] Parquet Support
-- [ ] GroupBy Aggregations
+1. **Schema-first design**  
+   Define your data types once, get type safety and optimizations everywhere.
+
+2. **Built for Bun**  
+   Uses Bun's file I/O and SIMD capabilities. No polyfills, and unfortunately no Node.js compatibility layers.
+
+3. **Zero dependencies**  
+   The entire library has zero runtime dependencies. Install with confidence.
+
+4. **Clean error handling**  
+   Operations throw errors when they fail - simple and predictable. Wrap in try/catch when needed.
+
+## LazyFrame for Large Files
+
+For big datasets, use LazyFrame for automatic query optimization:
+
+```typescript
+import { LazyFrame, DType } from "molniya";
+
+const schema = {
+  product: DType.String,
+  category: DType.String,
+  revenue: DType.Float64,
+};
+
+const result = await LazyFrame.scanCsv("sales.csv", schema)
+  .filter("category", "==", "Electronics") // Pushed down to scan
+  .filter("revenue", ">", 1000)
+  .select(["product", "revenue"]) // Only load these columns
+  .collect(); // Execute optimized plan
+```
+
+LazyFrame analyzes your query and:
+
+- **Predicate pushdown** - Filters during CSV parsing
+- **Column pruning** - Only reads needed columns
+- **Query fusion** - Combines operations when possible
+
+**Real impact:** For a 1GB CSV file, this can mean reading only 100MB.
+
+## Learn More
+
+**New to Molniya?**
+
+- [Introduction](https://molniya.andka.id/guide/introduction) - Core concepts
+- [Getting Started](https://molniya.andka.id/guide/getting-started) - Complete walkthrough
+
+**Ready to build?**
+
+- [Cookbook](https://molniya.andka.id/guide/cookbook) - Copy-paste recipes
+- [Examples](https://github.com/xirf/molniya/tree/main/examples) - Real code
+
+**Need details?**
+
+- [API Reference](https://molniya.andka.id/api/dataframe) - Full API docs
+- [Data Types](https://molniya.andka.id/guide/data-types) - Type system guide
+- [Lazy Evaluation](https://molniya.andka.id/guide/lazy-evaluation) - Performance optimization
+
+## Community
+
+- [GitHub](https://github.com/xirf/molniya) - Source code and issues
+- [Discussions](https://github.com/xirf/molniya/discussions) - Ask questions
+- [Contributing](./CONTRIBUTING.md) - Help improve Molniya
 
 ## License
 
-Proudly open source under the MIT License. See `LICENSE` for details.
+MIT License. See [LICENSE](./LICENSE) for details.
