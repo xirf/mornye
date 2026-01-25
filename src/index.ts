@@ -1,74 +1,99 @@
-/**
- * Molniya - High-performance data manipulation for Bun.js
- *
- * A Pandas-like library leveraging Bun's speed with ergonomic type inference.
- *
- * @example
- * ```ts
- * import { readCsv, DataFrame, Series, m } from 'molniya';
- *
- * // Read CSV with automatic type inference
- * const df = await readCsv('./data.csv');
- * df.print();
- *
- * // Create DataFrame with explicit schema
- * const df2 = DataFrame.from(
- *   { age: m.int32(), name: m.string() },
- *   [{ age: 25, name: 'Alice' }]
- * );
- *
- * // Access typed columns
- * const ages = df2.col('age'); // Series<'int32'>
- *
- * // For large files (10GB+), use lazy loading
- * const lazy = await scanCsv('./huge_dataset.csv');
- * const first10 = await lazy.head(10);
- *
- * // Configure memory limits for server-side safety
- * configure({ globalLimitBytes: 512 * 1024 * 1024 }); // 512MB
- * ```
- */
+// Types
+export type { Result } from './types/result';
+export { ok, err, unwrap } from './types/result';
+export { DType } from './types/dtypes';
+export type { Schema } from './core/schema';
 
-// Core type system
-export { m } from './core/types';
-export type {
-  DType,
-  DTypeKind,
-  Schema,
-  InferSchema,
-  InferDType,
-  StorageType,
-} from './core/types';
+// Core column types
+export type { Column } from './core/column';
+export { enableNullTracking, setColumnValue, getColumnValue } from './core/column';
 
-// Global configuration
-export { configure, getConfig, resetConfig, getDefaultConfig, getMemoryStats } from './core/config';
-export type { MemoryConfig, MemoryStats, AllocationResult } from './core/config';
+// Null utilities
+export type { NullBitmap } from './utils/nulls';
+export { isNull, setNull, setNotNull, createNullBitmap } from './utils/nulls';
 
-// Data structures
-export { Series } from './core/series';
-export type { ISeries, SeriesView } from './core/series';
-
-export { DataFrame } from './core/dataframe';
-export type { IDataFrame, DataFrameView } from './core/dataframe';
-
-// Lazy loading for large files
-export { LazyFrame } from './core/lazyframe';
-export type { ILazyFrame, LazyFrameConfig, LazyFrameView } from './core/lazyframe';
-
-// I/O
-export { readCsv, readCsvNode, scanCsv, toCsv, writeCsv } from './io/csv';
-export type { CsvOptions, CsvWriteOptions } from './io/csv';
-export { toJson, toJsonRecords } from './io/json';
-
-// Errors
+// DataFrame
+export type { DataFrame } from './dataframe/dataframe';
 export {
-  MolniyaError,
-  ColumnNotFoundError,
-  IndexOutOfBoundsError,
-  TypeMismatchError,
-  InvalidOperationError,
-  FileError,
-  ParseError,
-  SchemaError,
-  MemoryLimitError,
-} from './errors';
+  createDataFrame,
+  getRowCount,
+  getColumnNames,
+  getColumn,
+  addColumn,
+} from './dataframe/dataframe';
+
+// DataFrame factory functions (high-level API)
+export { from, fromArrays } from './dataframe/factory';
+export type { ColumnSpec, InferSchemaType } from './dataframe/factory';
+
+// Operations
+export type { FilterOperator } from './types/operators';
+export { filter, select } from './dataframe/operations';
+
+// Print/formatting
+export { formatDataFrame } from './dataframe/print';
+export type { PrintOptions } from './dataframe/print';
+
+// Missing data operations
+export { isna, notna, dropna, fillna } from './dataframe/missing';
+
+// Manipulation operations
+export { drop, rename } from './dataframe/manipulation';
+
+// Join operations
+export type { JoinType } from './dataframe/joins';
+export { merge, concat, join } from './dataframe/joins';
+// Row operations
+export { append, duplicate, dropDuplicates, unique } from './dataframe/row-ops';
+// Type conversion operations
+export { astype } from './dataframe/convert';
+
+// String operations
+export {
+  strLower,
+  strUpper,
+  strStrip,
+  strContains,
+  strStartsWith,
+  strEndsWith,
+  strReplace,
+  strLen,
+} from './dataframe/string-ops';
+
+// Dictionary (for string operations)
+export { getString, internString } from './memory/dictionary';
+
+// Sorting utilities
+export type { SortDirection, SortSpec } from './utils/sort';
+export {
+  createRowIndices,
+  sortByColumn,
+  sortByColumns,
+  findGroupBoundaries,
+  isSorted,
+} from './utils/sort';
+
+// GroupBy
+export type { AggFunc, AggSpec } from './dataframe/groupby';
+export { groupby } from './dataframe/groupby';
+
+// LazyFrame (Lazy Evaluation)
+export { LazyFrame } from './lazyframe/lazyframe';
+export type {
+  PlanNode,
+  ScanPlan,
+  FilterPlan,
+  SelectPlan,
+  GroupByPlan,
+} from './lazyframe/plan';
+export { QueryPlan, executePlan, optimizePlan } from './lazyframe';
+
+// Cache system
+export { CacheManager, getCacheManager, resetCacheManager } from './lazyframe/cache';
+
+// IO operations
+export { readCsv, readCsvFromString, scanCsv, scanCsvFromString } from './io';
+export type { CsvOptions, CsvScanOptions } from './io';
+
+// This will be the main export file for the molniya library
+// More exports will be added as we implement more features
