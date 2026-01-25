@@ -25,11 +25,7 @@ describe('filter operation', () => {
     setColumnValue(volumeCol, 3, 40);
     setColumnValue(volumeCol, 4, 50);
 
-    const result = filter(df, 'price', '==', 100.5);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    const filtered = result.data;
+    const filtered = filter(df, 'price', '==', 100.5);
     expect(getRowCount(filtered)).toBe(3);
 
     const filteredPrice = filtered.columns.get('price')!;
@@ -54,11 +50,7 @@ describe('filter operation', () => {
     setColumnValue(col, 2, 1);
     setColumnValue(col, 3, 0);
 
-    const result = filter(df, 'status', '!=', 0);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    const filtered = result.data;
+    const filtered = filter(df, 'status', '!=', 0);
     expect(getRowCount(filtered)).toBe(2);
 
     const statusCol = filtered.columns.get('status')!;
@@ -77,11 +69,7 @@ describe('filter operation', () => {
     setColumnValue(col, 3, 25.0);
     setColumnValue(col, 4, 75.0);
 
-    const result = filter(df, 'value', '>', 50);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    const filtered = result.data;
+    const filtered = filter(df, 'value', '>', 50);
     expect(getRowCount(filtered)).toBe(2);
 
     const valueCol = filtered.columns.get('value')!;
@@ -98,11 +86,7 @@ describe('filter operation', () => {
     setColumnValue(col, 1, 50.0);
     setColumnValue(col, 2, 30.0);
 
-    const result = filter(df, 'value', '<', 40);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    const filtered = result.data;
+    const filtered = filter(df, 'value', '<', 40);
     expect(getRowCount(filtered)).toBe(2);
 
     const valueCol = filtered.columns.get('value')!;
@@ -121,11 +105,7 @@ describe('filter operation', () => {
     setColumnValue(col, 3, 85);
     setColumnValue(col, 4, 90);
 
-    const result = filter(df, 'score', '>=', 85);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    const filtered = result.data;
+    const filtered = filter(df, 'score', '>=', 85);
     expect(getRowCount(filtered)).toBe(3);
 
     const scoreCol = filtered.columns.get('score')!;
@@ -144,11 +124,7 @@ describe('filter operation', () => {
     setColumnValue(col, 2, 20);
     setColumnValue(col, 3, 35);
 
-    const result = filter(df, 'age', '<=', 25);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    const filtered = result.data;
+    const filtered = filter(df, 'age', '<=', 25);
     expect(getRowCount(filtered)).toBe(2);
 
     const ageCol = filtered.columns.get('age')!;
@@ -168,11 +144,7 @@ describe('filter operation', () => {
     setColumnValue(col, 4, 5);
     setColumnValue(col, 5, 6);
 
-    const result = filter(df, 'id', 'in', [2, 4, 6]);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    const filtered = result.data;
+    const filtered = filter(df, 'id', 'in', [2, 4, 6]);
     expect(getRowCount(filtered)).toBe(3);
 
     const idCol = filtered.columns.get('id')!;
@@ -192,11 +164,7 @@ describe('filter operation', () => {
     setColumnValue(col, 3, 1);
     setColumnValue(col, 4, 2);
 
-    const result = filter(df, 'category', 'not-in', [1, 3]);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    const filtered = result.data;
+    const filtered = filter(df, 'category', 'not-in', [1, 3]);
     expect(getRowCount(filtered)).toBe(2);
 
     const categoryCol = filtered.columns.get('category')!;
@@ -226,14 +194,7 @@ describe('filter operation', () => {
 
     // Filter: price > 100 AND volume >= 10
     const step1 = filter(df, 'price', '>', 100);
-    expect(step1.ok).toBe(true);
-    if (!step1.ok) return;
-
-    const step2 = filter(step1.data, 'volume', '>=', 10);
-    expect(step2.ok).toBe(true);
-    if (!step2.ok) return;
-
-    const filtered = step2.data;
+    const filtered = filter(step1, 'volume', '>=', 10);
     expect(getRowCount(filtered)).toBe(1);
 
     const finalPrice = filtered.columns.get('price')!;
@@ -252,11 +213,7 @@ describe('filter operation', () => {
     setColumnValue(col, 1, 20.0);
     setColumnValue(col, 2, 30.0);
 
-    const result = filter(df, 'value', '>', 100);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    const filtered = result.data;
+    const filtered = filter(df, 'value', '>', 100);
     expect(getRowCount(filtered)).toBe(0);
   });
 
@@ -264,33 +221,21 @@ describe('filter operation', () => {
     const df = createDataFrame();
     addColumn(df, 'value', DType.Float64, 3);
 
-    const result = filter(df, 'nonexistent', '>', 10);
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-
-    expect(result.error.message).toContain("Column 'nonexistent' not found");
+    expect(() => filter(df, 'nonexistent', '>', 10)).toThrow("Column 'nonexistent' not found");
   });
 
   test('rejects array value for non-array operator', () => {
     const df = createDataFrame();
     addColumn(df, 'value', DType.Int32, 3);
 
-    const result = filter(df, 'value', '==', [1, 2, 3]);
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-
-    expect(result.error.message).toContain('requires a single value');
+    expect(() => filter(df, 'value', '==', [1, 2, 3])).toThrow('requires a single value');
   });
 
   test('rejects single value for array operator', () => {
     const df = createDataFrame();
     addColumn(df, 'value', DType.Int32, 3);
 
-    const result = filter(df, 'value', 'in', 1);
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-
-    expect(result.error.message).toContain('requires an array value');
+    expect(() => filter(df, 'value', 'in', 1)).toThrow('requires an array value');
   });
 
   test('handles DateTime comparison', () => {
@@ -302,11 +247,7 @@ describe('filter operation', () => {
     setColumnValue(col, 1, 2000n);
     setColumnValue(col, 2, 1500n);
 
-    const result = filter(df, 'timestamp', '>', 1500n);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    const filtered = result.data;
+    const filtered = filter(df, 'timestamp', '>', 1500n);
     expect(getRowCount(filtered)).toBe(1);
 
     const tsCol = filtered.columns.get('timestamp')!;
@@ -326,11 +267,7 @@ describe('select operation', () => {
     setColumnValue(aCol, 1, 2);
     setColumnValue(aCol, 2, 3);
 
-    const result = select(df, ['a']);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    const selected = result.data;
+    const selected = select(df, ['a']);
     expect(getRowCount(selected)).toBe(3);
     expect(selected.columnOrder).toEqual(['a']);
 
@@ -346,11 +283,7 @@ describe('select operation', () => {
     addColumn(df, 'b', DType.Float64, 2);
     addColumn(df, 'c', DType.Int32, 2);
 
-    const result = select(df, ['c', 'a']);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    const selected = result.data;
+    const selected = select(df, ['c', 'a']);
     expect(selected.columnOrder).toEqual(['c', 'a']);
     expect(selected.columns.has('b')).toBe(false);
   });
@@ -360,11 +293,7 @@ describe('select operation', () => {
     addColumn(df, 'x', DType.Int32, 1);
     addColumn(df, 'y', DType.Float64, 1);
 
-    const result = select(df, ['x', 'y']);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    const selected = result.data;
+    const selected = select(df, ['x', 'y']);
     expect(getRowCount(selected)).toBe(1);
     expect(selected.columnOrder).toEqual(['x', 'y']);
   });
@@ -373,11 +302,7 @@ describe('select operation', () => {
     const df = createDataFrame();
     addColumn(df, 'a', DType.Int32, 1);
 
-    const result = select(df, ['a', 'nonexistent']);
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-
-    expect(result.error.message).toContain("Column 'nonexistent' not found");
+    expect(() => select(df, ['a', 'nonexistent'])).toThrow("Column 'nonexistent' not found");
   });
 
   test('select preserves data correctly', () => {
@@ -396,11 +321,7 @@ describe('select operation', () => {
     setColumnValue(valueCol, 1, 2.5);
     setColumnValue(valueCol, 2, 3.5);
 
-    const result = select(df, ['value', 'id']);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    const selected = result.data;
+    const selected = select(df, ['value', 'id']);
     const selValue = selected.columns.get('value')!;
     const selId = selected.columns.get('id')!;
 
@@ -416,11 +337,7 @@ describe('select operation', () => {
   test('select on empty DataFrame returns empty DataFrame', () => {
     const df = createDataFrame();
 
-    const result = select(df, []);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    const selected = result.data;
+    const selected = select(df, []);
     expect(getRowCount(selected)).toBe(0);
   });
 });

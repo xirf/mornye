@@ -218,8 +218,13 @@ async function executePlanOnDataSkippingPushedFilters(
       }
 
       // Apply filter normally
-      // @ts-ignore - Dynamic execution
-      return filter(inputResult.data, plan.column, plan.operator, plan.value);
+      try {
+        // @ts-ignore - Dynamic execution
+        const filtered = filter(inputResult.data, plan.column, plan.operator, plan.value);
+        return ok(filtered);
+      } catch (error) {
+        return err(error instanceof Error ? error : new Error(String(error)));
+      }
     }
 
     case 'select': {
@@ -232,8 +237,13 @@ async function executePlanOnDataSkippingPushedFilters(
       if (!inputResult.ok) return inputResult;
 
       // Apply select to the result
-      // @ts-ignore - Dynamic execution
-      return select(inputResult.data, plan.columns);
+      try {
+        // @ts-ignore - Dynamic execution
+        const selected = select(inputResult.data, plan.columns);
+        return ok(selected);
+      } catch (error) {
+        return err(error instanceof Error ? error : new Error(String(error)));
+      }
     }
 
     case 'groupby': {
@@ -270,8 +280,13 @@ async function executeFilter(plan: FilterPlan): Promise<Result<DataFrame, Error>
   }
 
   // Apply filter
-  // @ts-ignore - Dynamic execution
-  return filter(inputResult.data, plan.column, plan.operator, plan.value);
+  try {
+    // @ts-ignore - Dynamic execution
+    const filtered = filter(inputResult.data, plan.column, plan.operator, plan.value);
+    return ok(filtered);
+  } catch (error) {
+    return err(error instanceof Error ? error : new Error(String(error)));
+  }
 }
 
 /**
@@ -292,8 +307,13 @@ async function executePlanOnData(
       if (!inputResult.ok) return inputResult;
 
       // Apply filter to the result
-      // @ts-ignore - Dynamic execution
-      return filter(inputResult.data, plan.column, plan.operator, plan.value);
+      try {
+        // @ts-ignore - Dynamic execution
+        const filtered = filter(inputResult.data, plan.column, plan.operator, plan.value);
+        return ok(filtered);
+      } catch (error) {
+        return err(error instanceof Error ? error : new Error(String(error)));
+      }
     }
 
     case 'select': {
@@ -302,8 +322,13 @@ async function executePlanOnData(
       if (!inputResult.ok) return inputResult;
 
       // Apply select to the result
-      // @ts-ignore - Dynamic execution
-      return select(inputResult.data, plan.columns);
+      try {
+        // @ts-ignore - Dynamic execution
+        const selected = select(inputResult.data, plan.columns);
+        return ok(selected);
+      } catch (error) {
+        return err(error instanceof Error ? error : new Error(String(error)));
+      }
     }
 
     case 'groupby': {
@@ -336,8 +361,13 @@ async function executeSelect(plan: SelectPlan): Promise<Result<DataFrame, Error>
   }
 
   // Apply select
-  // @ts-ignore - Dynamic execution
-  return select(inputResult.data, plan.columns);
+  try {
+    // @ts-ignore - Dynamic execution
+    const selected = select(inputResult.data, plan.columns);
+    return ok(selected);
+  } catch (error) {
+    return err(error instanceof Error ? error : new Error(String(error)));
+  }
 }
 
 /**

@@ -4,6 +4,9 @@ export { ok, err, unwrap } from './types/result';
 export { DType } from './types/dtypes';
 export type { Schema } from './core/schema';
 
+// Series
+export { Series, SeriesStringMethods } from './types/series';
+
 // Core column types
 export type { Column } from './core/column';
 export { enableNullTracking, setColumnValue, getColumnValue } from './core/column';
@@ -25,6 +28,12 @@ export {
 // DataFrame factory functions (high-level API)
 export { from, fromArrays } from './dataframe/factory';
 export type { ColumnSpec, InferSchemaType } from './dataframe/factory';
+
+// Slicing operations
+export { head, tail } from './dataframe/slicing';
+
+// Aggregation operations
+export { sum, mean, min, max, count, median, mode } from './dataframe/aggregation';
 
 // Operations
 export type { FilterOperator } from './types/operators';

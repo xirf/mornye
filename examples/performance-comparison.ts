@@ -58,8 +58,7 @@ async function main() {
     console.log('--- Direct DataFrame Operations ---');
     const directStart = performance.now();
 
-    const csvData = csvContent;
-    const readResult = await readCsv(csvData, { schema });
+    const readResult = await readCsv(csvPath, { schema });
     if (!readResult.ok) {
       console.error('Failed to read CSV:', readResult.error);
       return;
@@ -68,26 +67,9 @@ async function main() {
     let df = readResult.data;
 
     // Apply operations manually
-    const filter1 = filter(df, 'price', '>', 52000);
-    if (!filter1.ok) {
-      console.error('Filter 1 failed');
-      return;
-    }
-    df = filter1.data;
-
-    const filter2 = filter(df, 'volume', '>', 50);
-    if (!filter2.ok) {
-      console.error('Filter 2 failed');
-      return;
-    }
-    df = filter2.data;
-
-    const selectResult = select(df, ['category', 'volume']);
-    if (!selectResult.ok) {
-      console.error('Select failed');
-      return;
-    }
-    df = selectResult.data;
+    df = filter(df, 'price', '>', 52000);
+    df = filter(df, 'volume', '>', 50);
+    df = select(df, ['category', 'volume']);
 
     const groupbyResult = groupby(
       df,

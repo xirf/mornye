@@ -210,11 +210,9 @@ describe('SIMD Operations', () => {
 
       for (const { op, val } of tests) {
         const result = filter(df, 'values', op, val);
-        expect(result.ok).toBe(true);
-        if (!result.ok) continue;
 
         // Manually verify some results
-        const col = getColumn(result.data, 'values');
+        const col = getColumn(result, 'values');
         expect(col.ok).toBe(true);
         if (!col.ok) continue;
 
@@ -260,10 +258,8 @@ describe('SIMD Operations', () => {
       }
 
       const result = filter(df, 'values', '>', 50);
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
 
-      const resultCol = getColumn(result.data, 'values');
+      const resultCol = getColumn(result, 'values');
       expect(resultCol.ok).toBe(true);
       if (!resultCol.ok) return;
 
@@ -294,8 +290,7 @@ describe('SIMD Operations', () => {
       // Measure SIMD path (large dataset, automatic)
       const simdStart = performance.now();
       for (let i = 0; i < 10; i++) {
-        const result = filter(df, 'values', '>', 0);
-        expect(result.ok).toBe(true);
+        filter(df, 'values', '>', 0);
       }
       const simdTime = performance.now() - simdStart;
 
@@ -313,8 +308,7 @@ describe('SIMD Operations', () => {
       // Measure scalar path
       const scalarStart = performance.now();
       for (let i = 0; i < 10; i++) {
-        const result = filter(smallDf, 'values', '>', 0);
-        expect(result.ok).toBe(true);
+        filter(smallDf, 'values', '>', 0);
       }
       const scalarTime = performance.now() - scalarStart;
 
