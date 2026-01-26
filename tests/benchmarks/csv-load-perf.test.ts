@@ -1,12 +1,21 @@
 import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { getRowCount } from '../../src/dataframe/dataframe';
 import { readCsvFromString } from '../../src/io/csv-reader';
 import { scanCsvFromString } from '../../src/io/csv-scanner';
 import { DType } from '../../src/types/dtypes';
 
 describe('CSV Loading Performance Spec', () => {
-  const csvPath = 'D:\\code\\js\\mornye\\artifac\\btcusd_1-min_data.csv';
+  const csvPath = resolve(process.cwd(), 'artifac', 'btcusd_1-min_data.csv');
+  const csvExists = existsSync(csvPath);
+
+  if (!csvExists) {
+    test.skip('requires Bitcoin CSV dataset', () => {
+      // dataset missing; skip
+    });
+    return;
+  }
 
   const schema = {
     Timestamp: DType.Float64,

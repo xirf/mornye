@@ -68,6 +68,18 @@ describe('LazyFrame', () => {
     }
   });
 
+  test('sort builds sort plan', () => {
+    const schema = { price: DType.Float64, volume: DType.Int32 };
+    const lf = LazyFrame.scanCsv('data.csv', schema).sort('price', 'desc');
+
+    const plan = lf.getPlan();
+    expect(plan.type).toBe('sort');
+    if (plan.type === 'sort') {
+      expect(plan.columns).toEqual(['price']);
+      expect(plan.directions).toEqual(['desc']);
+    }
+  });
+
   test('chains multiple operations', () => {
     const schema = { symbol: DType.String, price: DType.Float64, volume: DType.Int32 };
     const lf = LazyFrame.scanCsv('data.csv', schema)

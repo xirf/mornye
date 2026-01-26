@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { getColumnValue } from '../../src/core/column';
 import { getColumn, getRowCount } from '../../src/dataframe/dataframe';
 import { readCsv } from '../../src/io/csv-reader';
@@ -7,7 +9,15 @@ import { DType } from '../../src/types/dtypes';
 import { formatDateTime } from '../../src/utils/datetime';
 
 describe('Bitcoin CSV Integration Test', () => {
-  const csvPath = 'D:\\code\\js\\mornye\\artifac\\btcusd_1-min_data.csv';
+  const csvPath = resolve(process.cwd(), 'artifac', 'btcusd_1-min_data.csv');
+  const csvExists = existsSync(csvPath);
+
+  if (!csvExists) {
+    test.skip('requires Bitcoin CSV dataset', () => {
+      // dataset missing; skip
+    });
+    return;
+  }
 
   test('loads Bitcoin 1-minute OHLCV data using scanCsv', async () => {
     // Define schema matching the CSV structure
