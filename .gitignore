@@ -48,3 +48,4 @@ benchmarks/data
 ./benchmarks/artifac
 
 tests/fixtures
+.molniya_cache
