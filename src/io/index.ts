@@ -1,30 +1,21 @@
 /**
- * I/O module exports
+ * Public exports for the io module.
  */
 
-// CSV parsing
 export {
-  parseCsvLine,
-  parseCsvHeader,
-  type CsvParseOptions,
-} from './csv-parser';
+	type CsvOptions,
+	CsvParser,
+	createCsvParser,
+} from "./csv-parser.ts";
 
-// CSV eager reading
-export { readCsv, readCsvFromString } from './csv-reader';
-export type { CsvOptions } from './csv-reader';
-
-// CSV streaming/chunked scanning
-export { scanCsv, scanCsvFromString } from './csv-scanner';
-export type { CsvScanOptions } from './csv-scanner';
-
-// Columnar batch primitives
 export {
-  ColumnarBatchBuilder,
-  DEFAULT_BATCH_BYTES,
-} from './columnar-batch';
-export type {
-  ColumnarBatch,
-  ColumnarBatchColumn,
-  ColumnarBatchIterator,
-  ColumnarData,
-} from './columnar-batch';
+	type CsvSchemaSpec,
+	CsvSource,
+	readCsvFile,
+	readCsvString,
+} from "./csv-source.ts";
+
+export {
+	ParquetReader,
+	readParquet,
+} from "./parquet/reader.ts";

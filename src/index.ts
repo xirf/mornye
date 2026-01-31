@@ -1,118 +1,165 @@
-// Types
-export type { Result } from './types/result';
-export { ok, err, unwrap } from './types/result';
-export { DType } from './types/dtypes';
-export type { Schema } from './core/schema';
+/**
+ * Mornye - High-performance, stream-only, binary-level data manipulation for Bun
+ *
+ * Main entry point for the library.
+ */
 
-// Series
-export { Series, SeriesStringMethods } from './types/series';
-
-// Core column types
-export type { Column } from './core/column';
-export { enableNullTracking, setColumnValue, getColumnValue } from './core/column';
-
-// Null utilities
-export type { NullBitmap } from './utils/nulls';
-export { isNull, setNull, setNotNull, createNullBitmap } from './utils/nulls';
-
-// DataFrame
-export type { DataFrame } from './dataframe/dataframe';
+// Re-export buffer
 export {
-  createDataFrame,
-  getRowCount,
-  getColumnNames,
-  getColumn,
-  addColumn,
-} from './dataframe/dataframe';
-
-// DataFrame factory functions (high-level API)
-export { from, fromArrays } from './dataframe/factory';
-export type { ColumnSpec, InferSchemaType } from './dataframe/factory';
-
-// Slicing operations
-export { head, tail } from './dataframe/slicing';
-
-// Aggregation operations
-export { sum, mean, min, max, count, median, mode } from './dataframe/aggregation';
-
-// Operations
-export type { FilterOperator } from './types/operators';
-export { filter, select } from './dataframe/operations';
-
-// Print/formatting
-export { formatDataFrame } from './dataframe/print';
-export type { PrintOptions } from './dataframe/print';
-
-// Missing data operations
-export { isna, notna, dropna, fillna } from './dataframe/missing';
-
-// Manipulation operations
-export { drop, rename } from './dataframe/manipulation';
-
-// Join operations
-export type { JoinType } from './dataframe/joins';
-export { merge, concat, join } from './dataframe/joins';
-// Row operations
-export { append, duplicate, dropDuplicates, unique } from './dataframe/row-ops';
-// Type conversion operations
-export { astype } from './dataframe/convert';
-
-// String operations
+	Chunk,
+	ColumnBuffer,
+	columnBufferFromArray,
+	createChunkFromArrays,
+	createColumnBuffer,
+	createDictionary,
+	createEmptyChunk,
+	type DictIndex,
+	Dictionary,
+	NULL_INDEX,
+	type TypedArray,
+} from "./buffer/index.ts";
+// Re-export DataFrame
 export {
-  strLower,
-  strUpper,
-  strStrip,
-  strContains,
-  strStartsWith,
-  strEndsWith,
-  strReplace,
-  strLen,
-} from './dataframe/string-ops';
-
-// Dictionary (for string operations)
-export { getString, internString } from './memory/dictionary';
-
-// Sorting utilities
-export type { SortDirection, SortSpec } from './utils/sort';
+	DataFrame,
+	fromCsvString,
+	fromRecords,
+	readCsv,
+	readParquet,
+} from "./dataframe/index.ts";
+// Re-export expressions
 export {
-  createRowIndices,
-  sortByColumn,
-  sortByColumns,
-  findGroupBoundaries,
-  isSorted,
-} from './utils/sort';
-
-// GroupBy
-export type { AggFunc, AggSpec } from './dataframe/groupby';
-export { groupby } from './dataframe/groupby';
-
-// LazyFrame (Lazy Evaluation)
-export { LazyFrame } from './lazyframe/lazyframe';
-export type {
-  PlanNode,
-  ScanPlan,
-  FilterPlan,
-  SelectPlan,
-  GroupByPlan,
-} from './lazyframe/plan';
-export { QueryPlan, executePlan, optimizePlan } from './lazyframe';
-
-// Cache system
-export { CacheManager, getCacheManager, resetCacheManager } from './lazyframe/cache';
-
-// IO operations
-export { readCsv, readCsvFromString, scanCsv, scanCsvFromString } from './io';
-export type { CsvOptions, CsvScanOptions } from './io';
+	add,
+	and,
+	applyPredicate,
+	applyValue,
+	avg,
+	// Compiler
+	type CompiledPredicate,
+	type CompiledValue,
+	col,
+	compilePredicate,
+	compileValue,
+	count,
+	div,
+	type Expr,
+	ExprType,
+	first,
+	formatExpr,
+	// Type inference
+	type InferredType,
+	inferExprType,
+	isPredicateExpr,
+	last,
+	lit,
+	max,
+	min,
+	mod,
+	mul,
+	neg,
+	not,
+	or,
+	sub,
+	sum,
+	validateExpr,
+} from "./expr/index.ts";
+// Re-export I/O
 export {
-  ColumnarBatchBuilder,
-  DEFAULT_BATCH_BYTES,
-} from './io';
-export type {
-  ColumnarBatch,
-  ColumnarBatchColumn,
-  ColumnarBatchIterator,
-  ColumnarData,
-} from './io';
-
-// This will be the main export file for the molniya library
-// More exports will be added as we implement more features
+	type CsvOptions,
+	CsvParser,
+	type CsvSchemaSpec,
+	CsvSource,
+	createCsvParser,
+	ParquetReader,
+	readCsvFile,
+	readCsvString,
+} from "./io/index.ts";
+// Re-export operators
+export {
+	AggregateOperator,
+	type AggSpec,
+	// Aggregation
+	type AggState,
+	AggType,
+	aggregate,
+	asc,
+	type ComputedColumn,
+	// Concat
+	concatChunks,
+	createAggState,
+	desc,
+	// Filter
+	FilterOperator,
+	filter,
+	from,
+	GroupByOperator,
+	groupBy,
+	hashJoin,
+	innerJoin,
+	type JoinConfig,
+	// Join
+	JoinType,
+	// Limit
+	LimitOperator,
+	leftJoin,
+	limit,
+	// Base
+	type Operator,
+	type OperatorResult,
+	opDone,
+	opEmpty,
+	opResult,
+	PassthroughOperator,
+	// Pipeline
+	Pipeline,
+	PipelineBuilder,
+	type PipelineResult,
+	// Project
+	ProjectOperator,
+	type ProjectSpec,
+	pipeline,
+	project,
+	projectWithRename,
+	SimpleOperator,
+	type SortKey,
+	// Sort
+	SortOperator,
+	sort,
+	// Transform
+	TransformOperator,
+	transform,
+	validateConcatSchemas,
+	withColumn,
+} from "./ops/index.ts";
+// Re-export types
+export {
+	addColumn,
+	type ColumnDef,
+	createSchema,
+	DType,
+	DTypeKind,
+	type DTypeToTS,
+	dropColumns,
+	ErrorCode,
+	err,
+	formatSchema,
+	getColumn,
+	getColumnByIndex,
+	getColumnIndex,
+	getColumnNames,
+	getDTypeSize,
+	getErrorMessage,
+	hasColumn,
+	isBigIntDType,
+	isErr,
+	isIntegerDType,
+	isNumericDType,
+	isOk,
+	ok,
+	type Result,
+	renameColumn,
+	type Schema,
+	type SchemaSpec,
+	selectColumns,
+	unwrap,
+	unwrapOr,
+} from "./types/index.ts";

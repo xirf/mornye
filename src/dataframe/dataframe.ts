@@ -1,127 +1,149 @@
-import { type Column, createColumn, getColumnDType } from '../core/column';
-import type { Schema } from '../core/schema';
-import { type StringDictionary, createDictionary } from '../memory/dictionary';
-import type { DType } from '../types/dtypes';
-import { type Result, err, ok, unwrapErr } from '../types/result';
+/* DATAFRAME PUBLIC API
+/*-----------------------------------------------------
+/* Main DataFrame export with all methods attached
+/* ==================================================== */
+
+// Core class
+export { DataFrame } from "./core.ts";
+
+import type { Chunk } from "../buffer/chunk.ts";
+import { addAggMethods } from "./aggregation.ts";
+import { addCleaningMethods } from "./cleaning.ts";
+import { addConcatMethods } from "./concatenation.ts";
+import { DataFrame } from "./core.ts";
+import { addDedupMethods } from "./dedup.ts";
+import { addExecutionMethods } from "./execution.ts";
+// Method modules
+import { addFilteringMethods } from "./filtering.ts";
+import { addJoinMethods } from "./joins.ts";
+import { addLimitingMethods } from "./limiting.ts";
+import { addProjectionMethods } from "./projection.ts";
+import { addSortingMethods } from "./sorting.ts";
+import { addStringMethods } from "./string-ops.ts";
+import { addTransformMethods } from "./transformation.ts";
+
+/* ATTACH METHODS TO PROTOTYPE
+/*-----------------------------------------------------
+/* Wire all modular methods to DataFrame class
+/* ==================================================== */
+
+addFilteringMethods(DataFrame.prototype);
+addProjectionMethods(DataFrame.prototype);
+addTransformMethods(DataFrame.prototype);
+addCleaningMethods(DataFrame.prototype);
+addDedupMethods(DataFrame.prototype);
+addStringMethods(DataFrame.prototype);
+addLimitingMethods(DataFrame.prototype);
+addAggMethods(DataFrame.prototype);
+addSortingMethods(DataFrame.prototype);
+addJoinMethods(DataFrame.prototype);
+addConcatMethods(DataFrame.prototype);
+addExecutionMethods(DataFrame.prototype);
+
+/* HELPER FUNCTIONS
+/*-----------------------------------------------------
+/* Convenience functions for creating DataFrames
+/* ==================================================== */
+
+import { createDictionary } from "../buffer/dictionary.ts";
+import { type CsvOptions, type CsvSchemaSpec, CsvSource } from "../io/index.ts";
+import { unwrap } from "../types/error.ts";
+import { createSchema, type SchemaSpec } from "../types/schema.ts";
 
 /**
- * DataFrame represents a collection of columns with the same row count
+ * Create DataFrame from records (array of objects).
  */
-export interface DataFrame<T = unknown> {
-  /** Columns stored in insertion order */
-  columns: Map<string, Column>;
-  /** Column names in order */
-  columnOrder: string[];
-  /** String dictionary for all String columns */
-  dictionary?: StringDictionary;
+/**
+ * Create DataFrame from records (array of objects).
+ */
+export function fromRecords<T = Record<string, unknown>>(
+	records: Record<string, unknown>[],
+	schema: SchemaSpec,
+): DataFrame<T> {
+	if (records.length === 0) {
+		const s = unwrap(createSchema(schema));
+		return DataFrame.empty<T>(s, createDictionary());
+	}
+
+	// Parse records manually into CSV-like format and use parser
+	const headers = Object.keys(schema);
+	const csvLines = [headers.join(",")];
+	for (const record of records) {
+		const values = headers.map((h) => String(record[h] ?? ""));
+		csvLines.push(values.join(","));
+	}
+	const csvString = csvLines.join("\n");
+
+	const source = unwrap(CsvSource.fromString(csvString, schema));
+	const chunks = source.parseSync();
+	const s = unwrap(createSchema(schema));
+	return DataFrame.fromChunks<T>(chunks, s, source.getDictionary());
 }
 
 /**
- * Creates a new empty DataFrame
- * @returns DataFrame instance
+ * Create DataFrame from CSV string.
  */
-export function createDataFrame<T = unknown>(): DataFrame<T> {
-  return {
-    columns: new Map(),
-    columnOrder: [],
-    dictionary: createDictionary(),
-  };
+export function fromCsvString<T = Record<string, unknown>>(
+	csvString: string,
+	schema: CsvSchemaSpec,
+	options?: CsvOptions,
+): DataFrame<T> {
+	const source = unwrap(CsvSource.fromString(csvString, schema, options));
+	const chunks = source.parseSync();
+	return DataFrame.fromChunks<T>(
+		chunks,
+		source.getSchema(),
+		source.getDictionary(),
+	);
 }
 
 /**
- * Gets all column names in order
- * @param df - The DataFrame
- * @returns Array of column names
+ * Read CSV file and create DataFrame using true streaming.
+ * Memory-bounded: processes file in chunks without loading all data.
  */
-export function getColumnNames<T>(df: DataFrame<T>): string[] {
-  return df.columnOrder;
+export async function readCsv<T = Record<string, unknown>>(
+	path: string,
+	schema: CsvSchemaSpec,
+	options?: CsvOptions,
+): Promise<DataFrame<T>> {
+	const source = unwrap(CsvSource.fromFile(path, schema, options));
+
+	// Return lazy DataFrame immediately
+	// source implements AsyncIterable, so it creates a new stream on iteration
+	return DataFrame.fromStream<T>(
+		source as unknown as AsyncIterable<Chunk>,
+		source.getSchema(),
+		source.getDictionary(),
+	);
 }
 
 /**
- * Gets the number of rows in the DataFrame
- * @param df - The DataFrame
- * @returns Row count (0 if no columns)
+ * Read Parquet file and create DataFrame.
+ * Note: Currently loads entirely into memory.
  */
-export function getRowCount<T>(df: DataFrame<T>): number {
-  if (df.columnOrder.length === 0) {
-    return 0;
-  }
-  // All columns must have same length, so return first column's length
-  const firstColName = df.columnOrder[0];
-  if (!firstColName) {
-    return 0;
-  }
-  const firstCol = df.columns.get(firstColName);
-  return firstCol ? firstCol.length : 0;
+import { readParquet as ioReadParquet } from "../io/index.ts";
+
+export async function readParquet<T = Record<string, unknown>>(
+	path: string,
+): Promise<DataFrame<T>> {
+	return ioReadParquet(path);
 }
 
-/**
- * Gets a column by name
- * @param df - The DataFrame
- * @param columnName - The column name
- * @returns Result with Column or error
- */
-export function getColumn<T>(
-  df: DataFrame<T>,
-  columnName: unknown extends T ? string : keyof T & string,
-): Result<Column, string> {
-  const col = df.columns.get(columnName);
-  if (!col) {
-    return err(`Column '${columnName}' not found`);
-  }
-  return ok(col);
-}
+/* EXPRESSION BUILDERS
+/*-----------------------------------------------------
+/* Re-export expression builders for convenience
+/* ==================================================== */
 
-/**
- * Adds a new column to the DataFrame
- * @param df - The DataFrame
- * @param columnName - The column name
- * @param dtype - The data type
- * @param length - Number of rows
- * @returns Result indicating success or error
- */
-export function addColumn<T>(
-  df: DataFrame<T>,
-  columnName: string,
-  dtype: DType,
-  length: number,
-): Result<true, string> {
-  // Check for duplicate name
-  if (df.columns.has(columnName)) {
-    return err(`Column '${columnName}' already exists`);
-  }
-
-  // If DataFrame has columns, new column must match row count
-  const currentRowCount = getRowCount(df);
-  if (currentRowCount > 0 && length !== currentRowCount) {
-    return err(`Column length ${length} does not match DataFrame row count ${currentRowCount}`);
-  }
-
-  // Create the column
-  const colResult = createColumn(dtype, length, columnName);
-  if (!colResult.ok) {
-    return err(unwrapErr(colResult));
-  }
-
-  // Add to DataFrame
-  df.columns.set(columnName, colResult.data);
-  df.columnOrder.push(columnName);
-
-  return ok(true);
-}
-
-/**
- * Gets the schema (column names -> dtypes) of the DataFrame
- * @param df - The DataFrame
- * @returns Schema object
- */
-export function getSchema<T>(df: DataFrame<T>): Schema {
-  const schema: Schema = {};
-  for (const colName of df.columnOrder) {
-    const col = df.columns.get(colName);
-    if (col) {
-      schema[colName] = getColumnDType(col);
-    }
-  }
-  return schema;
-}
+export {
+	add,
+	avg,
+	col,
+	count,
+	div,
+	lit,
+	max,
+	min,
+	mul,
+	sub,
+	sum,
+} from "../expr/builders.ts";

@@ -1,0 +1,317 @@
+/**
+ * Chunk: A batch of rows stored in columnar format.
+ *
+ * A Chunk is the unit of data that flows through the pipeline.
+ * It contains multiple columns and optionally a selection vector.
+ *
+ * Key properties:
+ * - Columns are stored as TypedArrays for cache efficiency
+ * - Selection vector enables filtering without copying data
+ * - All columns have the same logical length
+ */
+
+import { DTypeKind } from "../types/dtypes.ts";
+import { ErrorCode, err, ok, type Result } from "../types/error.ts";
+import { getColumnNames, type Schema } from "../types/schema.ts";
+import { ColumnBuffer, type TypedArray } from "./column-buffer.ts";
+import type { DictIndex, Dictionary } from "./dictionary.ts";
+
+/**
+ * A chunk of columnar data.
+ */
+export class Chunk {
+	/** Schema describing the columns */
+	readonly schema: Schema;
+
+	/** Column data indexed by column position */
+	private readonly columns: ColumnBuffer[];
+
+	/** Dictionary for string columns (shared across chunk) */
+	readonly dictionary: Dictionary | null;
+
+	/** Selection vector (indices of valid rows). Null means all rows are valid. */
+	private selection: Uint32Array | null;
+
+	/** Number of selected rows */
+	private selectedCount: number;
+
+	/** Actual number of rows in the underlying buffers */
+	private physicalRowCount: number;
+
+	constructor(
+		schema: Schema,
+		columns: ColumnBuffer[],
+		dictionary: Dictionary | null = null,
+	) {
+		this.schema = schema;
+		this.columns = columns;
+		this.dictionary = dictionary;
+		this.selection = null;
+		this.physicalRowCount = columns.length > 0 ? (columns[0]?.length ?? 0) : 0;
+		this.selectedCount = this.physicalRowCount;
+	}
+
+	/** Number of rows (after selection) */
+	get rowCount(): number {
+		return this.selectedCount;
+	}
+
+	/** Number of columns */
+	get columnCount(): number {
+		return this.schema.columnCount;
+	}
+
+	/** Get column buffer by index */
+	getColumn(index: number): ColumnBuffer | undefined {
+		return this.columns[index];
+	}
+
+	/** Get column buffer by name */
+	getColumnByName(name: string): ColumnBuffer | undefined {
+		const idx = this.schema.columnMap.get(name);
+		if (idx === undefined) return undefined;
+		return this.columns[idx];
+	}
+
+	/** Check if a selection vector is active */
+	hasSelection(): boolean {
+		return this.selection !== null;
+	}
+
+	/** Get the selection vector (or null if all rows selected) */
+	getSelection(): Uint32Array | null {
+		return this.selection;
+	}
+
+	/** Get raw columns (internal access for operators) */
+	getColumns(): ColumnBuffer[] {
+		return this.columns;
+	}
+
+	/**
+	 * Apply a selection vector.
+	 * This doesn't copy data; it just marks which rows are valid.
+	 */
+	applySelection(selection: Uint32Array, count: number): void {
+		if (this.selection === null) {
+			// First selection - use directly
+			this.selection = selection;
+			this.selectedCount = count;
+		} else {
+			// Compose selections: map through existing selection
+			const newSelection = new Uint32Array(count);
+			for (let i = 0; i < count; i++) {
+				const idx = selection[i] ?? 0;
+				newSelection[i] = this.selection[idx] ?? 0;
+			}
+			this.selection = newSelection;
+			this.selectedCount = count;
+		}
+	}
+
+	/** Clear selection (all rows become valid again) */
+	clearSelection(): void {
+		this.selection = null;
+		this.selectedCount = this.physicalRowCount;
+	}
+
+	/**
+	 * Get the physical row index for a logical row.
+	 * If no selection, physical = logical.
+	 */
+	physicalIndex(logicalIndex: number): number {
+		if (this.selection === null) {
+			return logicalIndex;
+		}
+		return this.selection[logicalIndex] ?? logicalIndex;
+	}
+
+	/**
+	 * Get a value from the chunk.
+	 * Returns the value at the logical row index (respects selection).
+	 */
+	getValue(
+		columnIndex: number,
+		rowIndex: number,
+	): TypedArray[number] | undefined {
+		const column = this.columns[columnIndex];
+		if (column === undefined) return undefined;
+
+		const physIdx = this.physicalIndex(rowIndex);
+		return column.get(physIdx);
+	}
+
+	/**
+	 * Check if a cell is null.
+	 */
+	isNull(columnIndex: number, rowIndex: number): boolean {
+		const column = this.columns[columnIndex];
+		if (column === undefined) return true;
+
+		const physIdx = this.physicalIndex(rowIndex);
+		return column.isNull(physIdx);
+	}
+
+	/**
+	 * Get string value (resolves dictionary index OR returns direct value).
+	 */
+	getStringValue(columnIndex: number, rowIndex: number): string | undefined {
+		const column = this.columns[columnIndex];
+		if (column === undefined) return undefined;
+		if (column.kind !== DTypeKind.String) return undefined;
+
+		const physIdx = this.physicalIndex(rowIndex);
+		const value = column.get(physIdx);
+
+		// If dictionary exists, dereference index
+		if (this.dictionary !== null) {
+			return this.dictionary.getString(value as DictIndex);
+		}
+
+		// Direct string value (e.g., from parquet)
+		return value as unknown as string;
+	}
+
+	/**
+	 * Materialize the chunk into a compact form (apply selection).
+	 * Returns a new Chunk with the selection baked in.
+	 */
+	materialize(): Result<Chunk> {
+		if (this.selection === null) {
+			// No selection, return self
+			return ok(this);
+		}
+
+		const newColumns: ColumnBuffer[] = [];
+
+		for (let i = 0; i < this.columns.length; i++) {
+			const srcCol = this.columns[i];
+			if (!srcCol) continue;
+			const dstCol = new ColumnBuffer(
+				srcCol.kind,
+				this.selectedCount,
+				srcCol.isNullable,
+			);
+
+			const error = dstCol.copySelected(
+				srcCol,
+				this.selection,
+				this.selectedCount,
+			);
+			if (error !== ErrorCode.None) {
+				return err(error);
+			}
+
+			newColumns.push(dstCol);
+		}
+
+		return ok(new Chunk(this.schema, newColumns, this.dictionary));
+	}
+
+	/**
+	 * Create an iterator over rows (for debugging/display).
+	 * Note: This allocates objects - don't use in hot paths!
+	 */
+	*rows(): IterableIterator<Record<string, unknown>> {
+		const columnNames = getColumnNames(this.schema);
+
+		for (let i = 0; i < this.rowCount; i++) {
+			const row: Record<string, unknown> = {};
+			for (let j = 0; j < this.columnCount; j++) {
+				const name = columnNames[j];
+				const col = this.columns[j];
+				if (!name || !col) continue;
+
+				if (this.isNull(j, i)) {
+					row[name] = null;
+				} else if (col.kind === DTypeKind.String && this.dictionary) {
+					row[name] = this.getStringValue(j, i);
+					row[name] = this.getValue(j, i);
+				}
+			}
+			yield row;
+		}
+	}
+
+	/**
+	 * Release columns for recycling and clear this chunk.
+	 */
+	dispose(): ColumnBuffer[] {
+		const cols = this.columns;
+		// Clear references
+		(this as unknown as { columns: ColumnBuffer[] }).columns = [];
+		return cols;
+	}
+}
+
+/**
+ * Create an empty chunk with the given schema.
+ */
+export function createEmptyChunk(
+	schema: Schema,
+	capacity: number,
+	dictionary: Dictionary | null = null,
+): Result<Chunk> {
+	if (capacity <= 0) {
+		return err(ErrorCode.InvalidCapacity);
+	}
+
+	const columns: ColumnBuffer[] = [];
+
+	for (const colDef of schema.columns) {
+		const buffer = new ColumnBuffer(
+			colDef.dtype.kind,
+			capacity,
+			colDef.dtype.nullable,
+		);
+		columns.push(buffer);
+	}
+
+	return ok(new Chunk(schema, columns, dictionary));
+}
+
+/**
+ * Create a chunk from arrays of data.
+ */
+export function createChunkFromArrays(
+	schema: Schema,
+	data: TypedArray[],
+	dictionary: Dictionary | null = null,
+): Result<Chunk> {
+	if (data.length !== schema.columnCount) {
+		return err(ErrorCode.SchemaMismatch);
+	}
+
+	// Validate all columns have same length
+	if (data.length > 0) {
+		const firstCol = data[0];
+		const length = firstCol ? firstCol.length : 0;
+		for (let i = 1; i < data.length; i++) {
+			if ((data[i]?.length ?? -1) !== length) {
+				return err(ErrorCode.SchemaMismatch);
+			}
+		}
+	}
+
+	const columns: ColumnBuffer[] = [];
+
+	for (let i = 0; i < schema.columns.length; i++) {
+		const colDef = schema.columns[i];
+		const arr = data[i];
+		if (!colDef || !arr) continue;
+		const buffer = new ColumnBuffer(
+			colDef.dtype.kind,
+			arr.length,
+			colDef.dtype.nullable,
+		);
+
+		// Copy data
+		// biome-ignore lint/suspicious/noExplicitAny: Generic casting
+		(buffer.data as TypedArray).set(arr as any);
+		(buffer as unknown as { _length: number })._length = arr.length;
+
+		columns.push(buffer);
+	}
+
+	return ok(new Chunk(schema, columns, dictionary));
+}

@@ -32,20 +32,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Finder (MacOS) folder config
 .DS_Store
-artifac/*
-!artifac/.gitkeep
 
-# If you use agent dont commit this files
-.agent/rules
-CLAUDE.md
-
-docs/.vitepress/dist
-docs/.vitepress/cache
-
-# Benchmark data (downloaded during CI/local runs)
-benchmarks/data
-./benchmarks/artifacts
-./benchmarks/artifac
-
-tests/fixtures
-.molniya_cache
+# test data
+tests/testdata/*.csv
+*.csv

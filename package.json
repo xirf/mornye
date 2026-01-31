@@ -1,60 +1,24 @@
 {
-  "name": "molniya",
-  "version": "0.0.2",
-  "author": "xirf",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/xirf/molniya.git"
-  },
-  "main": "dist/index.js",
-  "module": "dist/index.js",
-  "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
-    "@iconify-json/fa6-brands": "^1.2.6",
-    "@iconify-json/fa6-regular": "^1.2.4",
-    "@iconify-json/fa6-solid": "^1.2.4",
-    "@shikijs/vitepress-twoslash": "^2.1.0",
-    "@types/bun": "^1.3.6",
-    "lucide-vue-next": "^0.562.0",
-    "mitata": "^1.0.34",
-    "shiki": "^2.1.0",
-    "tsx": "^4.21.0",
-    "unocss": "^66.6.0",
-    "vitepress": "^1.6.4",
-    "vitepress-plugin-llms": "^1.10.0"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
-  },
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.js"
-    }
-  },
-  "bugs": {
-    "url": "https://github.com/xirf/molniya/issues"
-  },
-  "description": "A simply typed DataFrame library with zero dependencies that honors your memory.",
-  "files": ["dist", "README.md", "LICENSE"],
-  "homepage": "https://molniya.andka.id",
-  "keywords": ["dataframe", "pandas", "data-analysis", "bun", "typescript", "csv", "etl"],
-  "license": "MIT",
-  "scripts": {
-    "build": "rm -rf dist && bun build src/index.ts --outdir dist --target bun && tsc -p tsconfig.build.json",
-    "prepublishOnly": "npm run build",
-    "test": "bun test",
-    "lint": "biome check .",
-    "lint:fix": "biome check --write .",
-    "format": "biome format --write .",
-    "demo": "bun run examples/demo.ts",
-    "docs:dev": "vitepress dev docs",
-    "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs",
-    "codegen": "bun run scripts/codegen.ts",
-    "codegen:watch": "bun run scripts/codegen.ts --watch"
-  },
-  "type": "module",
-  "types": "dist/index.d.ts"
+	"name": "mornye",
+	"version": "0.1.0",
+	"module": "src/index.ts",
+	"devDependencies": {
+		"@biomejs/biome": "2.3.13",
+		"@types/bun": "latest"
+	},
+	"peerDependencies": {
+		"typescript": "^5"
+	},
+	"description": "High-performance, stream-only, binary-level data manipulation for Bun runtime",
+	"scripts": {
+		"test": "bun test",
+		"test:watch": "bun test --watch",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"format": "biome format --write ."
+	},
+	"type": "module",
+	"dependencies": {
+		"hyparquet": "^1.24.1"
+	}
 }
